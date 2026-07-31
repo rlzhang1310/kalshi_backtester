@@ -1,0 +1,20 @@
+.DS_Store
+.env
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.backfill_cursor
+data/
+
+fig
+*.tar.zst
+output
+.tmp
