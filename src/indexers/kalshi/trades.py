@@ -1,6 +1,6 @@
 """Indexer for Kalshi trades data."""
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -40,20 +40,21 @@ class KalshiTradesIndexer(Indexer):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         CURSOR_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-        # Load existing trade IDs for deduplication
-        existing_trade_ids: set[str] = set()
+        # A ticker with saved trades is already complete. Loading every trade ID
+        # into Python used tens of gigabytes on large backfills and is unnecessary:
+        # tickers selected below cannot overlap with the saved-trade tickers.
         existing_tickers: set[str] = set()
         parquet_files = list(DATA_DIR.glob("trades_*.parquet"))
         if parquet_files:
-            print("Loading existing trades for deduplication...")
+            print("Loading processed market tickers...")
             try:
-                result = duckdb.sql(f"SELECT DISTINCT trade_id, ticker FROM '{DATA_DIR}/trades_*.parquet'").fetchall()
-                for trade_id, ticker in result:
-                    existing_trade_ids.add(trade_id)
-                    existing_tickers.add(ticker)
-                print(f"Found {len(existing_trade_ids)} existing trades")
-            except Exception:
-                pass
+                result = duckdb.sql(
+                    f"SELECT DISTINCT ticker FROM '{DATA_DIR}/trades_*.parquet'"
+                ).fetchall()
+                existing_tickers = {row[0] for row in result}
+                print(f"Found {len(existing_tickers)} processed markets")
+            except Exception as exc:
+                print(f"Warning: could not load processed market tickers: {exc}")
 
         all_tickers = duckdb.sql(f"""
             SELECT DISTINCT ticker FROM '{MARKETS_DIR}/markets_*_*.parquet'
@@ -114,36 +115,55 @@ class KalshiTradesIndexer(Indexer):
                 if not trades:
                     return []
                 fetched_at = datetime.utcnow()
-                return [
-                    {**asdict(t), "_fetched_at": fetched_at} for t in trades if t.trade_id not in existing_trade_ids
-                ]
+                return [{**asdict(t), "_fetched_at": fetched_at} for t in trades]
             finally:
                 client.close()
 
-        # Concurrent fetching
+        # Keep only a bounded number of futures queued. Submitting millions of
+        # futures up front can consume tens of gigabytes before progress reaches 1%.
         pbar = tqdm(total=len(tickers_to_process), desc="Fetching trades")
         with ThreadPoolExecutor(max_workers=self._max_workers) as executor:
-            futures = {executor.submit(fetch_ticker_trades, ticker): ticker for ticker in tickers_to_process}
+            ticker_iter = iter(tickers_to_process)
+            max_pending = max(self._max_workers * 4, self._max_workers)
+            pending: dict[Future[list[dict]], str] = {}
 
-            for future in as_completed(futures):
-                ticker = futures[future]
+            def submit_next() -> bool:
                 try:
-                    trades_data = future.result()
-                    if trades_data:
-                        all_trades.extend(trades_data)
+                    ticker = next(ticker_iter)
+                except StopIteration:
+                    return False
+                pending[executor.submit(fetch_ticker_trades, ticker)] = ticker
+                return True
 
-                    pbar.update(1)
-                    pbar.set_postfix(buffer=len(all_trades), saved=total_trades_saved, last=ticker[-20:])
+            for _ in range(min(max_pending, len(tickers_to_process))):
+                submit_next()
 
-                    # Save in batches
-                    while len(all_trades) >= BATCH_SIZE:
-                        saved = save_batch(all_trades[:BATCH_SIZE])
-                        total_trades_saved += saved
-                        all_trades = all_trades[BATCH_SIZE:]
+            while pending:
+                done, _ = wait(pending, return_when=FIRST_COMPLETED)
+                for future in done:
+                    ticker = pending.pop(future)
+                    try:
+                        trades_data = future.result()
+                        if trades_data:
+                            all_trades.extend(trades_data)
 
-                except Exception as e:
-                    pbar.update(1)
-                    tqdm.write(f"Error fetching {ticker}: {e}")
+                        pbar.set_postfix(
+                            buffer=len(all_trades),
+                            saved=total_trades_saved,
+                            last=ticker[-20:],
+                        )
+
+                        # Save in batches
+                        while len(all_trades) >= BATCH_SIZE:
+                            saved = save_batch(all_trades[:BATCH_SIZE])
+                            total_trades_saved += saved
+                            all_trades = all_trades[BATCH_SIZE:]
+
+                    except Exception as e:
+                        tqdm.write(f"Error fetching {ticker}: {e}")
+                    finally:
+                        pbar.update(1)
+                        submit_next()
 
         pbar.close()
 
