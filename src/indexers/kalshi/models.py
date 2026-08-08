@@ -25,6 +25,8 @@ class Trade:
             """Converts string dollar values like '0.5600' to integer cents (56)."""
             if not val:
                 return 0
+            if len(val) >= 4:
+                return int(val.split('.')[1][:2])
             return int(float(val) * 100)
 
         def parse_float_string_to_int(val: Optional[str]) -> int:
