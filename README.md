@@ -1,5 +1,64 @@
 # sportsbetting
 
+## Sports win rate by price
+
+Run the calibration analysis and choose a sport followed by a market category
+in the terminal:
+
+```powershell
+python analyze.py win_rate_by_price
+```
+
+The category menu includes:
+
+- All
+- Moneyline
+- Spread
+- Score Total
+- Player Props
+- Team Props
+- Futures
+
+Choosing All applies only the sport filter and includes every finalized yes/no
+market for that sport, including mixed or not-yet-classified event families.
+
+You can also skip the prompts, which is useful for repeatable runs:
+
+```powershell
+python analyze.py win_rate_by_price --sport nfl --category all
+python analyze.py win_rate_by_price --sport nfl --category spread
+python analyze.py win_rate_by_price --sport ncaa_football --category score_total
+python analyze.py win_rate_by_price --sport esports --category moneyline
+```
+
+`score-total`, `player props`, and similar spelling variants are normalized to
+their canonical underscore names. Filtered files include both selections, such
+as `output/win_rate_by_price_nfl_spread.csv`, so one run does not overwrite
+another category.
+
+Market categories are inferred from Kalshi's event-family ticker. Unknown and
+mixed multi-leg families are intentionally excluded from the narrower filters
+rather than being forced into a misleading category. Non-player game props
+such as both-teams-to-score and exact-score markets are grouped under Team
+Props.
+
+Esports is available alongside the traditional sports. Its recognized event
+families include League of Legends, Counter-Strike, Dota 2, Valorant, Call of
+Duty, Rainbow Six, and Overwatch. Mixed esports families remain available
+through the All category even when they cannot be assigned safely to a narrower
+market category.
+
+The win-rate estimate remains weighted by traded maker/taker positions. Its
+95% confidence band treats each distinct traded market ticker as one cluster,
+uses a market-clustered standard error, and uses Student-t degrees of freedom
+equal to `unique_markets - 1` at each price. The CSV includes
+`unique_markets`, `degrees_of_freedom`, `clustered_standard_error_pct`, and
+`confidence_margin_pct`. The additive `confidence_status` column explains when
+an interval is unavailable because fewer than two markets contribute, the
+estimate is at a 0%/100% boundary, or the empirical cluster variance is zero.
+Intervals are pointwise; the reported margin is unclipped even though displayed
+bounds are clipped to 0–100%.
+
 ## Single-game odds visualizer
 
 Open an interactive Plotly chart from either a Kalshi event ticker or one of
