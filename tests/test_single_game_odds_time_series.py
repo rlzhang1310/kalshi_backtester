@@ -309,16 +309,24 @@ def test_ambiguous_suffix_requires_target() -> None:
         load_game_odds(event, client=client)
 
 
-def test_rejects_non_two_outcome_event() -> None:
+def test_three_outcome_event_uses_only_selected_yes_market() -> None:
     event = "THREE-WAY"
     markets = [
         make_market(f"{event}-{suffix}", event, suffix)
         for suffix in ("ONE", "TWO", "THREE")
     ]
-    client = FakeClient(live_markets={event: markets})
-
-    with pytest.raises(ValueError, match="exactly two"):
-        load_game_odds(event, target="ONE", client=client)
+    client = FakeClient(
+        live_markets={event: markets},
+        live_trades={
+            market.ticker: [raw_trade(market.ticker, "0.3000", "2026-01-01T00:00:00Z")]
+            for market in markets
+        },
+    )
+    game = load_game_odds(event, target="ONE", client=client)
+    assert game.compiled["target_raw_prob"].tolist() == [0.3]
+    assert {call[2] for call in client.calls if call[0] == "trades"} == {
+        markets[0].ticker
+    }
 
 
 def test_compile_can_invert_opponent_when_target_has_no_trades() -> None:

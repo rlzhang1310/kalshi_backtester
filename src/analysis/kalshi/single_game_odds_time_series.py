@@ -1,9 +1,9 @@
 """Interactive single-game Kalshi price visualization.
 
 The public ``visualize_game_odds`` function accepts either a Kalshi event
-ticker or one of that event's child market tickers. It discovers the two
-outcome markets, fetches both live and archived trades, converts the event to
-one target-side probability series, and opens a Plotly chart in the browser.
+ticker or one of that event's child market tickers. It loads local Parquet or
+live/archived API trades, converts them to a target-side probability series,
+and optionally adds sportsbook curves and a play-by-play track.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Protocol
 
 import httpx
@@ -21,6 +22,7 @@ import plotly.graph_objects as go
 
 from src.indexers.kalshi.client import KalshiClient
 from src.indexers.kalshi.models import Market
+from src.analysis.kalshi.local_game_data import DEFAULT_DATA_DIR, LocalGameStore
 
 
 TAKER_FEE_RATE = 0.07
@@ -179,6 +181,8 @@ def load_game_odds(
     start_time: str | datetime | pd.Timestamp | None = None,
     end_time: str | datetime | pd.Timestamp | None = None,
     client: GameOddsClient | None = None,
+    source: str = "api",
+    data_dir: str | Path = DEFAULT_DATA_DIR,
 ) -> GameOddsData:
     """Discover, fetch, and normalize the trades for one Kalshi game.
 
@@ -186,11 +190,52 @@ def load_game_odds(
     event ticker is supplied, ``target`` may be a child ticker, outcome suffix,
     or YES subtitle. If omitted, the function uses the child market whose
     suffix appears at the end of the event ticker (the convention used by the
-    reference sports-game notebook). When ``start_time`` is omitted, Kalshi's
-    linked sports milestone ``start_date`` is used automatically.
+    reference sports-game notebook). With source='api', an omitted start uses
+    Kalshi's linked sports milestone. With source='local', the entire stored
+    trade history is used unless a start is provided; no API call is made.
+    Events with more than two outcomes use only the selected market's trades.
     """
     requested_start = _to_utc_timestamp(start_time, "start_time")
     end = _to_utc_timestamp(end_time, "end_time")
+    if requested_start is not None and end is not None and requested_start > end:
+        raise ValueError("start_time must be before or equal to end_time")
+    if source == "local":
+        store = LocalGameStore(data_dir)
+        event, markets, input_market = store.resolve_markets(ticker)
+        _validate_game_markets(event, markets)
+        selected = _select_target_market(
+            event_ticker=event,
+            markets=markets,
+            requested_target=target,
+            input_market=input_market,
+        )
+        # Only a two-outcome event permits using the opposite YES as 1-p.
+        trade_markets = markets if len(markets) == 2 else [selected]
+        trades = store.load_trades(
+            [market.ticker for market in trade_markets],
+            start=requested_start,
+            end=end,
+        )
+        side = _outcome_key(selected, event)
+        trades["event_ticker"] = event
+        compiled = compile_event_trades_to_target(trades, selected.ticker, side)
+        return GameOddsData(
+            event_ticker=event,
+            target_ticker=selected.ticker,
+            target_side=side,
+            target_label=selected.yes_sub_title or side,
+            start_time=requested_start
+            if requested_start is not None
+            else trades["timestamp"].min(),
+            start_time_source="provided"
+            if requested_start is not None
+            else "first_local_trade",
+            markets=tuple(markets),
+            trades=trades,
+            compiled=compiled,
+        )
+    if source != "api":
+        raise ValueError("source must be 'local' or 'api'")
 
     owns_client = client is None
     active_client: GameOddsClient = client if client is not None else KalshiClient()
@@ -200,7 +245,7 @@ def load_game_odds(
             ticker,
             active_client,
         )
-        _validate_two_outcome_markets(event_ticker, markets)
+        _validate_game_markets(event_ticker, markets)
 
         if requested_start is None:
             start = _infer_game_start_time(active_client, event_ticker)
@@ -224,14 +269,14 @@ def load_game_odds(
         max_ts = int(end.timestamp()) if end is not None else None
         trades = _load_complete_trades(
             client=active_client,
-            markets=markets,
+            markets=markets if len(markets) == 2 else [target_market],
             event_ticker=event_ticker,
             min_ts=min_ts,
             max_ts=max_ts,
         )
         if trades.empty:
             raise ValueError(
-                f"No trades were returned for either market in {event_ticker!r}."
+                f"No trades were returned for the selected market(s) in {event_ticker!r}."
             )
 
         if start is not None:
@@ -273,8 +318,10 @@ def build_game_odds_figure(
     show_fee_lines: bool = True,
     width: int = 2500,
     height: int = 1300,
+    sportsbook_odds: pd.DataFrame | None = None,
+    pbp_events: pd.DataFrame | None = None,
 ) -> go.Figure:
-    """Build the polished, single-panel Plotly figure from compiled trades."""
+    """Build a Plotly odds chart, adding optional overlays only when present."""
     if compiled.empty:
         raise ValueError("compiled trades cannot be empty")
     if width < 1 or height < 1:
@@ -378,7 +425,9 @@ def build_game_odds_figure(
         automargin=True,
     )
 
-    return figure
+    from src.analysis.kalshi.game_overlays import add_game_overlays
+
+    return add_game_overlays(figure, compiled, sportsbook_odds, pbp_events)
 
 
 def figure_display_config(
@@ -422,6 +471,12 @@ def visualize_game_odds(
     width: int = 2500,
     height: int = 1300,
     client: GameOddsClient | None = None,
+    source: str = "api",
+    data_dir: str | Path = DEFAULT_DATA_DIR,
+    sportsbook_path: str | Path | None = None,
+    playbyplay_path: str | Path | None = None,
+    sportsbook_team: str | None = None,
+    sportsbook_side: str | None = None,
 ) -> go.Figure:
     """Fetch one game's Kalshi trades and optionally pop out its visualizer."""
     game = load_game_odds(
@@ -430,6 +485,18 @@ def visualize_game_odds(
         start_time=start_time,
         end_time=end_time,
         client=client,
+        source=source,
+        data_dir=data_dir,
+    )
+    from src.analysis.kalshi.game_overlays import load_game_overlays
+
+    books, events = load_game_overlays(
+        game,
+        data_dir=data_dir,
+        sportsbook_path=sportsbook_path,
+        playbyplay_path=playbyplay_path,
+        sportsbook_team=sportsbook_team,
+        sportsbook_side=sportsbook_side,
     )
     figure = build_game_odds_figure(
         game.compiled,
@@ -439,6 +506,8 @@ def visualize_game_odds(
         show_fee_lines=show_fee_lines,
         width=width,
         height=height,
+        sportsbook_odds=books,
+        pbp_events=events,
     )
 
     if show:
@@ -588,6 +657,9 @@ def _select_target_market(
             f"markets for event {event_ticker!r}."
         )
 
+    if len(markets) == 1:
+        return markets[0]
+
     suffix_matches = [
         market
         for market in markets
@@ -688,17 +760,12 @@ def _load_complete_trades(
     )
 
 
-def _validate_two_outcome_markets(
+def _validate_game_markets(
     event_ticker: str,
     markets: list[Market],
 ) -> None:
-    if len(markets) != 2:
-        choices = ", ".join(market.ticker for market in markets)
-        raise ValueError(
-            "The single-game visualizer currently requires exactly two "
-            f"outcome markets; {event_ticker!r} has {len(markets)}"
-            + (f": {choices}" if choices else ".")
-        )
+    if not markets:
+        raise ValueError(f"No outcome markets found for {event_ticker!r}.")
 
     wrong_event = [
         market.ticker
@@ -723,9 +790,11 @@ def _validate_two_outcome_markets(
         )
 
     outcome_keys = [_outcome_key(market, event_ticker) for market in markets]
-    if any(not outcome for outcome in outcome_keys) or len(set(outcome_keys)) != 2:
+    if any(not outcome for outcome in outcome_keys) or len(set(outcome_keys)) != len(
+        markets
+    ):
         raise ValueError(
-            f"Event {event_ticker!r} does not have two distinct outcome suffixes."
+            f"Event {event_ticker!r} does not have distinct outcome suffixes."
         )
 
 
@@ -771,7 +840,9 @@ def _resample_for_plot(
     plot_data["timestamp"] = pd.to_datetime(
         plot_data["timestamp"], utc=True, errors="coerce"
     )
-    plot_data = plot_data.dropna(subset=["timestamp"]).sort_values("timestamp")
+    plot_data = plot_data.dropna(subset=["timestamp"]).sort_values(
+        "timestamp", kind="stable"
+    )
     if plot_data.empty:
         raise ValueError("compiled trades do not contain any valid timestamps")
 
@@ -814,6 +885,6 @@ def _to_utc_timestamp(
         parsed = pd.to_datetime(value, utc=True, errors="raise")
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{argument_name} must be a valid date/time value") from exc
-    if not isinstance(parsed, pd.Timestamp):
+    if not isinstance(parsed, pd.Timestamp) or pd.isna(parsed):
         raise ValueError(f"{argument_name} must be a single date/time value")
     return parsed
