@@ -1,4 +1,4 @@
-"""Shared scenario controls and fullscreen Plotly model inspection."""
+"""Shared scenario controls and full-page Plotly model inspection."""
 
 from pathlib import Path
 
@@ -23,10 +23,10 @@ def update_scenario(prefix, name):
     st.session_state["scenario"][name] = st.session_state[f"{prefix}_{name}"]
 
 
-def scenario_controls(prefix):
+def scenario_controls(prefix, num_columns=2):
     defaults = dict(clv=60, p=60, t=0.5, b=55)
     state = st.session_state.setdefault("scenario", defaults)
-    columns = st.columns(2)
+    columns = st.columns(num_columns)
     definitions = [
         ("clv", "Pregame probability (CLV) (%)", 0, 100, 1, 0),
         ("p", "Current YES price x (¢)", 1, 100, 1, 1),
@@ -35,8 +35,9 @@ def scenario_controls(prefix):
     ]
     for name, label, low, high, step, col in definitions:
         key = f"{prefix}_{name}"
-        st.session_state[key] = state[name]
-        columns[col].slider(
+        if key not in st.session_state or st.session_state[key] != state[name]:
+            st.session_state[key] = state[name]
+        columns[col % num_columns].slider(
             label,
             low,
             high,
@@ -62,10 +63,11 @@ def cached_model(
     outcome,
     smoothing,
     boundary,
+    coordinate="log_odds",
     version=MODEL_VERSION,
 ):
     frame = reference_data(pd.read_parquet(path), family, ticker, as_of)
-    return fit_surface(frame, outcome, smoothing, boundary)
+    return fit_surface(frame, outcome, smoothing, boundary, coordinate)
 
 
 @st.cache_data(max_entries=12, show_spinner=False)
@@ -177,7 +179,10 @@ def chart_figures(
                 xaxis_title="Current price (¢)",
                 yaxis_title="Absolute bid (¢)",
                 zaxis=dict(title="Fitted probability", range=[0, 1], tickformat=".0%"),
-                uirevision=f"camera-{camera_revision}",
+                camera=dict(eye=dict(x=1.65, y=1.65, z=1.25)),
+                aspectmode="manual",
+                aspectratio=dict(x=1.2, y=1.2, z=0.8),
+                uirevision=f"camera-v2-{camera_revision}",
             )
         )
     else:
@@ -219,10 +224,10 @@ def chart_figures(
             xaxis_title="Current price (¢)", yaxis_title="Absolute bid (¢)"
         )
     main.update_layout(
-        height=540,
-        margin=dict(l=10, r=10, t=15, b=10),
+        height=640,
+        margin=dict(l=45, r=70, t=55, b=85),
         uirevision=f"view-{camera_revision}",
-        legend=dict(orientation="h", y=-0.12),
+        legend=dict(orientation="h", y=1.04, yanchor="bottom", x=0),
     )
     cross = go.Figure(
         go.Scatter(
@@ -329,26 +334,11 @@ def raw_section(model, family, clv, price, time, tolerances):
     return pd.DataFrame(rows)
 
 
-def dismiss_explorer():
-    st.session_state["surface_open"] = False
-
-
-@st.dialog(
-    "Fill probability · surface explorer", width="large", on_dismiss=dismiss_explorer
-)
 def surface_explorer(path, family, ticker, as_of, tolerances, minimum):
-    st.html("""<style>
-    div[data-testid="stDialog"] div[role="dialog"] {
-      position:fixed; inset:0;
-      width:100vw; max-width:100vw; height:100dvh; max-height:100dvh;
-      margin:0; border-radius:0; overflow:auto;
-    }
-    div[data-testid="stDialog"] div[role="dialog"] > div {max-height:none;}
-    </style>""")
-    if st.button("Close explorer", key="close_surface"):
-        dismiss_explorer()
-        st.rerun()
-    clv, price, time, bid = scenario_controls("explorer")
+    st.subheader("CLV Visualizer")
+    with st.sidebar:
+        st.subheader("Your scenario")
+        clv, price, time, bid = scenario_controls("explorer", num_columns=1)
     clv, price, bid = clv / 100, price / 100, bid / 100
     a, b, c = st.columns(3)
     mode = a.radio("View", ["Surface", "Heatmap"], horizontal=True)
@@ -363,6 +353,15 @@ def surface_explorer(path, family, ticker, as_of, tolerances, minimum):
         else str(x),
     )
     show_raw = st.checkbox("Show raw data", value=True)
+    coordinate = st.selectbox(
+        "Model scale",
+        ["log_odds", "probability"],
+        format_func=lambda value: "Log-odds"
+        if value == "log_odds"
+        else "Probability (previous model)",
+        key="surface_coordinate",
+        help="Changes how the model smooths across prices. Compare held-out scores in Model details; neither scale guarantees better accuracy.",
+    )
     boundary_mode = st.selectbox(
         "Zero-bid boundary",
         ["empirical", "assumed"],
@@ -397,6 +396,7 @@ def surface_explorer(path, family, ticker, as_of, tolerances, minimum):
         outcome,
         smoothing,
         boundary_mode,
+        coordinate,
         MODEL_VERSION,
     )
     try:
@@ -467,8 +467,14 @@ def surface_explorer(path, family, ticker, as_of, tolerances, minimum):
     )
     with st.expander("Model details, conflicts, and curvature"):
         st.write(
-            f"Local B-splines across CLV, price and time; monotone integrated splines along bid/current price. Curvature regularization: {model.strength:g}."
+            f"Model scale: {model.coordinate}. Local B-splines across CLV, price and time; monotone integrated bid splines. Curvature regularization: {model.strength:g}."
         )
+        if model.coordinate == "log_odds":
+            st.caption(
+                "CLV and price use finite log-odds with half-cent endpoint regularization. "
+                "Bid uses the log-odds gap, normalized between zero bid and current price. "
+                "Time, historical hit rates, support tolerances, and chart units are unchanged."
+            )
         st.json(model.validation)
         conflicts = model.validation["boundary_conflict_bins"]
         if boundary_mode == "assumed":

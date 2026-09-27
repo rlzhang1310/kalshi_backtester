@@ -8,10 +8,13 @@ from src.analysis.kalshi.fill_surface import (
     CONDITION_BASES,
     BID_BASES,
     bending,
+    bid_coordinate,
+    conditioning_coordinates,
     curvature,
     empirical_bins,
     fit_surface,
     fit_weights,
+    log_odds,
     predict,
     reference_data,
     surface_grid,
@@ -120,8 +123,11 @@ def test_penalty_gradient():
     assert (bending(moved)[0] - loss) / 1e-6 == pytest.approx(gradient[3, 2], abs=1e-3)
 
 
+@pytest.mark.parametrize("coordinate", ["probability", "log_odds"])
 @pytest.mark.parametrize("power", [1, 5])
-def test_spline_recovers_linear_and_curved_data_without_boundary_floor(power):
+def test_spline_recovers_linear_and_curved_data_without_boundary_floor(
+    power, coordinate
+):
     # A known data-generating curve verifies fit quality, rather than merely
     # asserting that the model is capable of producing a curved chart.
     bids = np.arange(0, 60) / 100
@@ -136,7 +142,7 @@ def test_spline_recovers_linear_and_curved_data_without_boundary_floor(power):
             n_events=500,
         )
     )
-    weights, _ = fit_weights(raw, 1e-7, "empirical")
+    weights, _ = fit_weights(raw, 1e-7, "empirical", coordinate)
     points = np.column_stack(
         [
             np.full(len(bids), 0.5),
@@ -145,7 +151,7 @@ def test_spline_recovers_linear_and_curved_data_without_boundary_floor(power):
             bids,
         ]
     )
-    fitted = predict(weights, points, "empirical")
+    fitted = predict(weights, points, "empirical", coordinate)
     assert np.sqrt(np.mean((fitted - target) ** 2)) < 0.015
     assert abs(fitted[0] - 0.12) < 0.025  # No forced .40 floor.
     assert (np.diff(fitted) >= -1e-12).all()
@@ -200,8 +206,70 @@ def test_validation_split_is_by_game(monkeypatch):
     monkeypatch.setattr(module, "empirical_bins", record)
     fitted = fit_surface(data, strength=0.01)
     assert fitted.validation["status"] == "whole-game holdout"
+    assert fitted.coordinate == "log_odds"
+    assert np.isfinite(fitted.validation["log_losses"][0.01])
+    for bucket in fitted.validation["calibration"][0.01]:
+        assert 0 <= bucket["observed"] <= 1
+        assert bucket["lower"] <= bucket["predicted"] <= bucket["upper"]
     assert calls[1].isdisjoint(calls[2])
     assert calls[1] | calls[2] == calls[0]
+
+
+def test_log_odds_endpoints_symmetry_and_time():
+    probabilities = np.array([0, 0.001, 0.01, 0.5, 0.99, 0.999, 1])
+    transformed = log_odds(probabilities)
+    assert np.isfinite(transformed).all()
+    assert (np.diff(transformed) > 0).all()
+    np.testing.assert_allclose(transformed, -log_odds(1 - probabilities), atol=1e-12)
+    points = np.column_stack([probabilities, probabilities, probabilities])
+    coords = conditioning_coordinates(points)
+    np.testing.assert_equal(coords[:, 2], probabilities)
+    np.testing.assert_allclose(coords[[0, -1], :2], [[0, 0], [1, 1]])
+    assert coords[2, 0] > probabilities[2]
+    np.testing.assert_equal(conditioning_coordinates(points, "probability"), points)
+
+
+@pytest.mark.parametrize("price", [0.001, 0.01, 0.5, 0.99, 1.0])
+@pytest.mark.parametrize("boundary", ["empirical", "assumed"])
+def test_log_odds_bid_endpoints_and_prediction_monotonicity(price, boundary):
+    bids = np.linspace(0, price, 501)
+    coordinates = bid_coordinate(bids, price)
+    assert coordinates[0] == 0
+    assert coordinates[-1] == 1
+    assert (np.diff(coordinates) > 0).all()
+    # Random control curves test constraints across the whole conditioning domain.
+    weights = np.random.default_rng(23).dirichlet(
+        np.ones(BID_BASES + 2), size=CONDITION_BASES**3
+    )
+    for clv in [0, 0.5, 1]:
+        points = np.column_stack(
+            [
+                np.full(len(bids), clv),
+                np.full(len(bids), price),
+                np.full(len(bids), 0.5),
+                bids,
+            ]
+        )
+        values = predict(weights, points, boundary)
+        assert np.isfinite(values).all()
+        assert ((values >= 0) & (values <= 1)).all()
+        assert (np.diff(values) >= -1e-12).all()
+        if boundary == "assumed":
+            assert values[0] == 1 - price
+
+
+def test_coordinate_choice_preserves_empirical_data_and_support():
+    source = observations()
+    odds = fit_surface(source, strength=0.01)
+    previous = fit_surface(source, strength=0.01, coordinate="probability")
+    pd.testing.assert_frame_equal(odds.raw, previous.raw)
+    points = [[0.6, 0.6, 0.5, 0.3], [0.6, 0.6, 1, 0.3], [0.6, 0.6, 0.5, 0.6]]
+    a, b = odds.evaluate(points, minimum=1), previous.evaluate(points, minimum=1)
+    for key in ["supported", "n_events", "n_observations"]:
+        np.testing.assert_equal(a[key], b[key])
+    assert not np.allclose(odds.weights, previous.weights)
+    with pytest.raises(ValueError, match="coordinates"):
+        fit_surface(source, coordinate="invalid")
 
 
 def test_chart_grids_and_selected_readout_match(model):

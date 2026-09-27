@@ -16,7 +16,9 @@ from scipy.sparse import csr_array
 
 from .fill_probability import normalize_family, utc
 
-MODEL_VERSION = 2
+MODEL_VERSION = 3
+# Half a cent: regularize endpoints continuously without flattening small bids.
+ODDS_EPSILON = 0.005
 DEGREE = 2
 CONDITION_KNOTS = np.r_[np.zeros(3), [0.25, 0.5, 0.75], np.ones(3)]
 CONDITION_BASES = len(CONDITION_KNOTS) - DEGREE - 1
@@ -99,10 +101,52 @@ def empirical_bins(frame, outcome="optimistic"):
     )
 
 
-def basis(points):
+def log_odds(values):
+    """Finite, strictly increasing log-odds, including exact zero and one."""
+    values = np.clip(np.asarray(values, dtype=float), 0, 1)
+    return np.log(values + ODDS_EPSILON) - np.log(1 - values + ODDS_EPSILON)
+
+
+def conditioning_coordinates(points, coordinate="log_odds"):
+    values = np.clip(np.asarray(points, dtype=float), 0, 1).copy()
+    if coordinate == "log_odds":
+        limit = float(log_odds(1))
+        values[:, :2] = (log_odds(values[:, :2]) + limit) / (2 * limit)
+    elif coordinate != "probability":
+        raise ValueError("Choose log_odds or probability coordinates.")
+    return values
+
+
+def bid_coordinate(bids, prices, coordinate="log_odds"):
+    """Normalize the log-odds gap to [0,1] between zero bid and current price.
+
+    r = 1 + (L(b) - L(p)) / (L(p) - L(0)). This retains the exact
+    bid-zero anchor and monotonicity while changing the smoothing geometry.
+    """
+    bids, prices = np.broadcast_arrays(bids, prices)
+    if coordinate == "log_odds":
+        numerator = log_odds(bids) - log_odds(0)
+        denominator = log_odds(prices) - log_odds(0)
+    elif coordinate == "probability":
+        numerator, denominator = bids, prices
+    else:
+        raise ValueError("Choose log_odds or probability coordinates.")
+    return np.clip(
+        np.divide(
+            numerator,
+            denominator,
+            out=np.zeros_like(numerator, dtype=float),
+            where=denominator > 0,
+        ),
+        0,
+        1,
+    )
+
+
+def basis(points, coordinate="log_odds"):
     """Sparse local tensor B-spline basis; neighboring slices share coefficients."""
     design = NdBSpline.design_matrix(
-        np.ascontiguousarray(np.clip(points, 0, 1), dtype=float),
+        np.ascontiguousarray(conditioning_coordinates(points, coordinate)),
         (CONDITION_KNOTS,) * 3,
         DEGREE,
     )
@@ -159,15 +203,17 @@ def bending(weights):
     return loss, result
 
 
-def fit_weights(raw, strength, boundary="empirical"):
+def fit_weights(raw, strength, boundary="empirical", coordinate="log_odds"):
     # Empirical mode learns from bid-zero observations. Only the optional
     # legacy assumption fixes their model value independently of coefficients.
     data = raw.loc[raw.bid > 0] if boundary == "assumed" else raw
     if data.empty:
         raise ValueError("No eligible empirical bid observations available to fit.")
-    design = basis(data[["clv", "current_price", "normalized_time"]].to_numpy())
+    design = basis(
+        data[["clv", "current_price", "normalized_time"]].to_numpy(), coordinate
+    )
     price = data.current_price.to_numpy()
-    bids = bid_basis(data.bid.to_numpy() / price, boundary)
+    bids = bid_basis(bid_coordinate(data.bid.to_numpy(), price, coordinate), boundary)
     offset = 1 - price if boundary == "assumed" else np.zeros_like(price)
     amplitude = price if boundary == "assumed" else np.ones_like(price)
     observed = data.probability.to_numpy()
@@ -202,12 +248,14 @@ def fit_weights(raw, strength, boundary="empirical"):
     return softmax(result.x.reshape(shape), axis=1), bool(result.success)
 
 
-def predict(weights, points, boundary="empirical"):
+def predict(weights, points, boundary="empirical", coordinate="log_odds"):
     points = np.asarray(points, dtype=float).reshape(-1, 4)
     p = points[:, 1]
-    relative = np.divide(points[:, 3], p, out=np.zeros_like(p), where=p > 0)
+    relative = bid_coordinate(points[:, 3], p, coordinate)
     learned = np.sum(
-        (basis(points[:, :3]) @ weights[:, :-1]) * bid_basis(relative, boundary), axis=1
+        (basis(points[:, :3], coordinate) @ weights[:, :-1])
+        * bid_basis(relative, boundary),
+        axis=1,
     )
     return np.clip(1 - p + p * learned if boundary == "assumed" else learned, 0, 1)
 
@@ -221,10 +269,11 @@ class SurfaceModel:
     validation: dict
     outcome: str
     boundary: str = "empirical"
+    coordinate: str = "log_odds"
 
     def evaluate(self, points, tolerances=(0.05, 0.05, 0.025), minimum=20):
         points = np.asarray(points, dtype=float).reshape(-1, 4)
-        fitted = predict(self.weights, points, self.boundary)
+        fitted = predict(self.weights, points, self.boundary, self.coordinate)
         counts = np.zeros(len(points), dtype=int)
         observations = np.zeros(len(points), dtype=int)
         source_coords = self.source[
@@ -255,13 +304,21 @@ class SurfaceModel:
         )
 
 
-def fit_surface(frame, outcome="optimistic", strength="auto", boundary="empirical"):
+def fit_surface(
+    frame,
+    outcome="optimistic",
+    strength="auto",
+    boundary="empirical",
+    coordinate="log_odds",
+):
     if outcome not in ("optimistic", "conservative"):
         raise ValueError("Choose optimistic or conservative.")
     if frame.empty:
         raise ValueError("No reference observations remain after filtering.")
     if boundary not in ("assumed", "empirical"):
         raise ValueError("Choose an assumed or empirical boundary.")
+    if coordinate not in ("log_odds", "probability"):
+        raise ValueError("Choose log_odds or probability coordinates.")
     raw = empirical_bins(frame, outcome)
     validation = {
         "status": "unvalidated",
@@ -286,10 +343,14 @@ def fit_surface(frame, outcome="optimistic", strength="auto", boundary="empirica
                 test_raw if boundary == "empirical" else test_raw.loc[test_raw.bid > 0]
             )
             scores = {}
+            log_losses = {}
+            calibration = {}
             positive_scores = {}
             convergence = {}
             for candidate in [1e-7, 1e-5, 1e-3] if strength == "auto" else [chosen]:
-                weights, converged = fit_weights(train_raw, candidate, boundary)
+                weights, converged = fit_weights(
+                    train_raw, candidate, boundary, coordinate
+                )
                 convergence[candidate] = converged
                 estimate = predict(
                     weights,
@@ -297,6 +358,7 @@ def fit_surface(frame, outcome="optimistic", strength="auto", boundary="empirica
                         ["clv", "current_price", "normalized_time", "bid"]
                     ].to_numpy(),
                     boundary,
+                    coordinate,
                 )
                 # Brier loss for Bernoulli labels aggregated to fractional event means.
                 loss = (
@@ -305,6 +367,33 @@ def fit_surface(frame, outcome="optimistic", strength="auto", boundary="empirica
                     + scored.probability.to_numpy()
                 )
                 scores[candidate] = float(np.average(loss, weights=scored.n_events))
+                safe = np.clip(estimate, 1e-9, 1 - 1e-9)
+                observed = scored.probability.to_numpy()
+                log_losses[candidate] = float(
+                    np.average(
+                        -observed * np.log(safe) - (1 - observed) * np.log1p(-safe),
+                        weights=scored.n_events,
+                    )
+                )
+                bins = np.minimum((estimate * 10).astype(int), 9)
+                calibration[candidate] = []
+                for bucket in range(10):
+                    mask = bins == bucket
+                    if mask.any():
+                        counts = scored.n_events.to_numpy()[mask]
+                        calibration[candidate].append(
+                            dict(
+                                lower=bucket / 10,
+                                upper=(bucket + 1) / 10,
+                                predicted=float(
+                                    np.average(estimate[mask], weights=counts)
+                                ),
+                                observed=float(
+                                    np.average(observed[mask], weights=counts)
+                                ),
+                                event_bin_weight=int(counts.sum()),
+                            )
+                        )
                 positive = scored.bid.to_numpy() > 0
                 positive_scores[candidate] = (
                     float(
@@ -319,13 +408,17 @@ def fit_surface(frame, outcome="optimistic", strength="auto", boundary="empirica
             validation = dict(
                 status="whole-game holdout",
                 scores=scores,
+                log_losses=log_losses,
+                calibration=calibration,
                 positive_bid_scores=positive_scores,
                 candidate_convergence=convergence,
                 train_events=int(train.event_ticker.nunique()),
                 holdout_events=int(test.event_ticker.nunique()),
                 note="Selection holdout Brier loss; not an independent final test or confidence interval.",
             )
-    weights, converged = fit_weights(raw, chosen, boundary)
+    weights, converged = fit_weights(raw, chosen, boundary, coordinate)
+    validation["coordinate"] = coordinate
+    validation["odds_epsilon"] = ODDS_EPSILON if coordinate == "log_odds" else None
     validation["boundary"] = boundary
     validation["optimizer_converged"] = converged
     validation["boundary_conflict_bins"] = (
@@ -333,7 +426,9 @@ def fit_surface(frame, outcome="optimistic", strength="auto", boundary="empirica
         if boundary == "assumed"
         else 0
     )
-    return SurfaceModel(weights, raw, frame, chosen, validation, outcome, boundary)
+    return SurfaceModel(
+        weights, raw, frame, chosen, validation, outcome, boundary, coordinate
+    )
 
 
 def surface_grid(model, clv, time, tolerances, minimum, resolution=51):

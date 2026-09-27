@@ -40,15 +40,7 @@
   const scan = () => {
     state.scheduled = false;
     if (state.disposed) return;
-    const dialog = document.querySelector('[data-testid="stDialog"] [role="dialog"]');
-    if (!dialog) {
-      state.dispose();
-      requestAnimationFrame(() => {
-        document.querySelector('.st-key-visualize button')?.focus({preventScroll: true});
-      });
-      return;
-    }
-    const graph = dialog.querySelector('.st-key-surface_main .js-plotly-plot');
+    const graph = document.querySelector('.st-key-surface_main .js-plotly-plot');
     if (graph !== state.graph && graph?.on) {
       detach();
       state.graph = graph;
@@ -64,7 +56,7 @@
     }
   };
   const resize = () => {
-    document.querySelectorAll('[data-testid="stDialog"] .js-plotly-plot')
+    document.querySelectorAll('.st-key-surface_main .js-plotly-plot, .st-key-surface_section .js-plotly-plot')
       .forEach(graph => window.Plotly?.Plots.resize(graph));
   };
   const observer = new MutationObserver(schedule);

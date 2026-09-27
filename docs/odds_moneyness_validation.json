@@ -1,0 +1,3968 @@
+{
+  "report_date": "2026-09-27",
+  "source": "Local prepared snapshots; optimistic price-reaching target; no excluded scenario ticker or settlement cutoff.",
+  "families": [
+    {
+      "family": "KXNFLGAME",
+      "version": "odds-moneyness-1",
+      "bounds": [
+        0.0,
+        9.190239700269178
+      ],
+      "audit": {
+        "source_states": 9602,
+        "eligible_states": 9602,
+        "excluded_states": 0,
+        "endpoint_prices": 0,
+        "invalid_prices": 0,
+        "ended_horizon": 0,
+        "bid_trials": 474175,
+        "side": "YES; upstream NO-taker prices complemented once",
+        "negative_distance": "Excluded: production bids must be strictly below current price.",
+        "source_distance_range": [
+          0.04000533461369919,
+          9.190239700269178
+        ]
+      },
+      "validation": {
+        "status": "whole-game tuning + independent test",
+        "reason": "Need at least 30 games, 10 training, 5 tuning and 5 independent test games.",
+        "model_version": "odds-moneyness-1",
+        "features": [
+          "log_odds_distance",
+          "normalized_time"
+        ],
+        "monotonic_distance": true,
+        "monotonicity_reason": "A farther below-market bid requires a lower future minimum under the same price-reaching horizon; pooled-price departures are checked in residual diagnostics.",
+        "empirical_distance_slope": -0.14549513352519086,
+        "train_events": 168,
+        "tuning_events": 34,
+        "test_events": 40,
+        "candidates": [
+          {
+            "strengths": [
+              1e-06,
+              1e-06
+            ],
+            "converged": true,
+            "brier": 0.17869879246880865,
+            "log_loss": 0.5289177717950976,
+            "trial_weight": 65970,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 9486,
+                "predicted": 0.0387591697118271,
+                "observed": 0.061775247733502
+              },
+              {
+                "bucket": 1,
+                "trials": 5572,
+                "predicted": 0.15031347324072958,
+                "observed": 0.21374730796841349
+              },
+              {
+                "bucket": 2,
+                "trials": 6057,
+                "predicted": 0.25115085816676697,
+                "observed": 0.30939408948324254
+              },
+              {
+                "bucket": 3,
+                "trials": 7198,
+                "predicted": 0.35211120065682416,
+                "observed": 0.39024729091414284
+              },
+              {
+                "bucket": 4,
+                "trials": 8351,
+                "predicted": 0.4499498539884449,
+                "observed": 0.4897617051850078
+              },
+              {
+                "bucket": 5,
+                "trials": 7305,
+                "predicted": 0.5490913282657066,
+                "observed": 0.5886379192334018
+              },
+              {
+                "bucket": 6,
+                "trials": 6252,
+                "predicted": 0.6499344576041073,
+                "observed": 0.6687460012795905
+              },
+              {
+                "bucket": 7,
+                "trials": 5488,
+                "predicted": 0.748661463051417,
+                "observed": 0.7591107871720116
+              },
+              {
+                "bucket": 8,
+                "trials": 5782,
+                "predicted": 0.8476310181162107,
+                "observed": 0.8441715669318575
+              },
+              {
+                "bucket": 9,
+                "trials": 4479,
+                "predicted": 0.9254594973778381,
+                "observed": 0.9370395177494977
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.0001,
+              0.0001
+            ],
+            "converged": true,
+            "brier": 0.17924589746604497,
+            "log_loss": 0.5336256246684701,
+            "trial_weight": 65970,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 10327,
+                "predicted": 0.038908865284590775,
+                "observed": 0.07504599593299119
+              },
+              {
+                "bucket": 1,
+                "trials": 5437,
+                "predicted": 0.14864092840411336,
+                "observed": 0.2260437741401508
+              },
+              {
+                "bucket": 2,
+                "trials": 5325,
+                "predicted": 0.2509965807197754,
+                "observed": 0.3126760563380282
+              },
+              {
+                "bucket": 3,
+                "trials": 5719,
+                "predicted": 0.35116897445144407,
+                "observed": 0.3783878300402168
+              },
+              {
+                "bucket": 4,
+                "trials": 6842,
+                "predicted": 0.45101428104885183,
+                "observed": 0.4565916398713826
+              },
+              {
+                "bucket": 5,
+                "trials": 7708,
+                "predicted": 0.5509058498642044,
+                "observed": 0.5533212247016087
+              },
+              {
+                "bucket": 6,
+                "trials": 8465,
+                "predicted": 0.6504382201348248,
+                "observed": 0.6487891317188423
+              },
+              {
+                "bucket": 7,
+                "trials": 7965,
+                "predicted": 0.7479992360376879,
+                "observed": 0.7721280602636534
+              },
+              {
+                "bucket": 8,
+                "trials": 7962,
+                "predicted": 0.8460248854751988,
+                "observed": 0.9045465963325797
+              },
+              {
+                "bucket": 9,
+                "trials": 220,
+                "predicted": 0.9031809916405633,
+                "observed": 0.95
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.01,
+              0.01
+            ],
+            "converged": false,
+            "brier": 0.18016646821245416,
+            "log_loss": 0.5355215629304523,
+            "trial_weight": 65970,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 9566,
+                "predicted": 0.04521700891104172,
+                "observed": 0.07035333472715868
+              },
+              {
+                "bucket": 1,
+                "trials": 6290,
+                "predicted": 0.14809165010085765,
+                "observed": 0.2192368839427663
+              },
+              {
+                "bucket": 2,
+                "trials": 5791,
+                "predicted": 0.24990596742098767,
+                "observed": 0.3118632360559489
+              },
+              {
+                "bucket": 3,
+                "trials": 6205,
+                "predicted": 0.3507431615050465,
+                "observed": 0.38823529411764707
+              },
+              {
+                "bucket": 4,
+                "trials": 6889,
+                "predicted": 0.4508045414858361,
+                "observed": 0.47437944549281463
+              },
+              {
+                "bucket": 5,
+                "trials": 7759,
+                "predicted": 0.5505759214251595,
+                "observed": 0.5686299780899601
+              },
+              {
+                "bucket": 6,
+                "trials": 8437,
+                "predicted": 0.6503840274714879,
+                "observed": 0.6664691240962427
+              },
+              {
+                "bucket": 7,
+                "trials": 8442,
+                "predicted": 0.7504084344010552,
+                "observed": 0.7904524994077233
+              },
+              {
+                "bucket": 8,
+                "trials": 6533,
+                "predicted": 0.8421902855319097,
+                "observed": 0.9145874789530078
+              },
+              {
+                "bucket": 9,
+                "trials": 58,
+                "predicted": 0.9053623074497554,
+                "observed": 0.9827586206896551
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.0001,
+              1e-06
+            ],
+            "converged": true,
+            "brier": 0.17877943954415265,
+            "log_loss": 0.5315934859005895,
+            "trial_weight": 65970,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 10383,
+                "predicted": 0.036113681400497755,
+                "observed": 0.06953674275257633
+              },
+              {
+                "bucket": 1,
+                "trials": 5285,
+                "predicted": 0.149245106776925,
+                "observed": 0.2272469252601703
+              },
+              {
+                "bucket": 2,
+                "trials": 5344,
+                "predicted": 0.25039140221737327,
+                "observed": 0.31511976047904194
+              },
+              {
+                "bucket": 3,
+                "trials": 5935,
+                "predicted": 0.35139585184819816,
+                "observed": 0.37961246840775065
+              },
+              {
+                "bucket": 4,
+                "trials": 6825,
+                "predicted": 0.4517677827357228,
+                "observed": 0.46608058608058606
+              },
+              {
+                "bucket": 5,
+                "trials": 7750,
+                "predicted": 0.5513945741597235,
+                "observed": 0.5507096774193548
+              },
+              {
+                "bucket": 6,
+                "trials": 8343,
+                "predicted": 0.6510724968162122,
+                "observed": 0.6542011266930361
+              },
+              {
+                "bucket": 7,
+                "trials": 8033,
+                "predicted": 0.7498328275099992,
+                "observed": 0.7738080418274618
+              },
+              {
+                "bucket": 8,
+                "trials": 7686,
+                "predicted": 0.846436236395678,
+                "observed": 0.9022898776997138
+              },
+              {
+                "bucket": 9,
+                "trials": 386,
+                "predicted": 0.907848559705007,
+                "observed": 0.9248704663212435
+              }
+            ]
+          },
+          {
+            "strengths": [
+              1e-06,
+              0.0001
+            ],
+            "converged": false,
+            "brier": 0.17919367167723135,
+            "log_loss": 0.5308018099654588,
+            "trial_weight": 65970,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 9716,
+                "predicted": 0.04461890086605229,
+                "observed": 0.06772334293948126
+              },
+              {
+                "bucket": 1,
+                "trials": 5581,
+                "predicted": 0.14864872275797059,
+                "observed": 0.2212865077943021
+              },
+              {
+                "bucket": 2,
+                "trials": 5783,
+                "predicted": 0.25110484234642055,
+                "observed": 0.3062424347224624
+              },
+              {
+                "bucket": 3,
+                "trials": 7014,
+                "predicted": 0.35204854453166695,
+                "observed": 0.38907898488736814
+              },
+              {
+                "bucket": 4,
+                "trials": 8553,
+                "predicted": 0.4506699686203011,
+                "observed": 0.48544370396352154
+              },
+              {
+                "bucket": 5,
+                "trials": 7271,
+                "predicted": 0.5484239048830972,
+                "observed": 0.5876770733049099
+              },
+              {
+                "bucket": 6,
+                "trials": 6127,
+                "predicted": 0.6480426691345675,
+                "observed": 0.6672107067080137
+              },
+              {
+                "bucket": 7,
+                "trials": 5470,
+                "predicted": 0.7446571711012672,
+                "observed": 0.7550274223034735
+              },
+              {
+                "bucket": 8,
+                "trials": 5897,
+                "predicted": 0.8457052497150584,
+                "observed": 0.8429710022045108
+              },
+              {
+                "bucket": 9,
+                "trials": 4558,
+                "predicted": 0.9254922390852862,
+                "observed": 0.936375603334796
+              }
+            ]
+          }
+        ],
+        "selected_tuning": {
+          "strengths": [
+            1e-06,
+            1e-06
+          ],
+          "converged": true,
+          "brier": 0.17869879246880865,
+          "log_loss": 0.5289177717950976,
+          "trial_weight": 65970,
+          "calibration": [
+            {
+              "bucket": 0,
+              "trials": 9486,
+              "predicted": 0.0387591697118271,
+              "observed": 0.061775247733502
+            },
+            {
+              "bucket": 1,
+              "trials": 5572,
+              "predicted": 0.15031347324072958,
+              "observed": 0.21374730796841349
+            },
+            {
+              "bucket": 2,
+              "trials": 6057,
+              "predicted": 0.25115085816676697,
+              "observed": 0.30939408948324254
+            },
+            {
+              "bucket": 3,
+              "trials": 7198,
+              "predicted": 0.35211120065682416,
+              "observed": 0.39024729091414284
+            },
+            {
+              "bucket": 4,
+              "trials": 8351,
+              "predicted": 0.4499498539884449,
+              "observed": 0.4897617051850078
+            },
+            {
+              "bucket": 5,
+              "trials": 7305,
+              "predicted": 0.5490913282657066,
+              "observed": 0.5886379192334018
+            },
+            {
+              "bucket": 6,
+              "trials": 6252,
+              "predicted": 0.6499344576041073,
+              "observed": 0.6687460012795905
+            },
+            {
+              "bucket": 7,
+              "trials": 5488,
+              "predicted": 0.748661463051417,
+              "observed": 0.7591107871720116
+            },
+            {
+              "bucket": 8,
+              "trials": 5782,
+              "predicted": 0.8476310181162107,
+              "observed": 0.8441715669318575
+            },
+            {
+              "bucket": 9,
+              "trials": 4479,
+              "predicted": 0.9254594973778381,
+              "observed": 0.9370395177494977
+            }
+          ]
+        },
+        "test_metrics": {
+          "brier": 0.1740264006217639,
+          "log_loss": 0.5168550667173363,
+          "trial_weight": 78615,
+          "calibration": [
+            {
+              "bucket": 0,
+              "trials": 10775,
+              "predicted": 0.03869824667262055,
+              "observed": 0.047610208816705336
+            },
+            {
+              "bucket": 1,
+              "trials": 6711,
+              "predicted": 0.15031602389961415,
+              "observed": 0.16405900759946357
+            },
+            {
+              "bucket": 2,
+              "trials": 7597,
+              "predicted": 0.25034267250348946,
+              "observed": 0.24536001053047254
+            },
+            {
+              "bucket": 3,
+              "trials": 8992,
+              "predicted": 0.3512917067415039,
+              "observed": 0.3153914590747331
+            },
+            {
+              "bucket": 4,
+              "trials": 9948,
+              "predicted": 0.45023655029274884,
+              "observed": 0.4083232810615199
+            },
+            {
+              "bucket": 5,
+              "trials": 8577,
+              "predicted": 0.5486007451023712,
+              "observed": 0.5103182931094788
+            },
+            {
+              "bucket": 6,
+              "trials": 7672,
+              "predicted": 0.6497340494380283,
+              "observed": 0.6119655891553701
+            },
+            {
+              "bucket": 7,
+              "trials": 6520,
+              "predicted": 0.7493788587353808,
+              "observed": 0.7202453987730061
+            },
+            {
+              "bucket": 8,
+              "trials": 6741,
+              "predicted": 0.8484121965573865,
+              "observed": 0.8307372793354102
+            },
+            {
+              "bucket": 9,
+              "trials": 5082,
+              "predicted": 0.9250398648771868,
+              "observed": 0.9380165289256198
+            }
+          ]
+        },
+        "test_optimizer_converged": true,
+        "diagnostics": {
+          "price_bands": [
+            {
+              "group": 0,
+              "events": 36,
+              "residual": 0.2906590019774895,
+              "brier": 0.15009865307670178,
+              "log_loss": 0.4609144963241132,
+              "trial_weight": 2356,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 4,
+                  "predicted": 0.0899696948340489,
+                  "observed": 0.75
+                },
+                {
+                  "bucket": 1,
+                  "trials": 21,
+                  "predicted": 0.16246807441489788,
+                  "observed": 0.9523809523809523
+                },
+                {
+                  "bucket": 2,
+                  "trials": 80,
+                  "predicted": 0.25901505100165356,
+                  "observed": 0.95
+                },
+                {
+                  "bucket": 3,
+                  "trials": 171,
+                  "predicted": 0.35610687715247075,
+                  "observed": 0.9239766081871345
+                },
+                {
+                  "bucket": 4,
+                  "trials": 242,
+                  "predicted": 0.45333951738825395,
+                  "observed": 0.9628099173553719
+                },
+                {
+                  "bucket": 5,
+                  "trials": 288,
+                  "predicted": 0.5520441759006324,
+                  "observed": 0.9652777777777778
+                },
+                {
+                  "bucket": 6,
+                  "trials": 329,
+                  "predicted": 0.6500046543197356,
+                  "observed": 0.9604863221884499
+                },
+                {
+                  "bucket": 7,
+                  "trials": 385,
+                  "predicted": 0.7503383965791063,
+                  "observed": 0.9584415584415584
+                },
+                {
+                  "bucket": 8,
+                  "trials": 478,
+                  "predicted": 0.8516054731753662,
+                  "observed": 0.9874476987447699
+                },
+                {
+                  "bucket": 9,
+                  "trials": 358,
+                  "predicted": 0.9226929802415288,
+                  "observed": 0.9888268156424581
+                }
+              ]
+            },
+            {
+              "group": 1,
+              "events": 40,
+              "residual": 0.24016913026741968,
+              "brier": 0.17160243294485675,
+              "log_loss": 0.5111775865025504,
+              "trial_weight": 7504,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 20,
+                  "predicted": 0.06781907899780339,
+                  "observed": 0.6
+                },
+                {
+                  "bucket": 1,
+                  "trials": 113,
+                  "predicted": 0.16167713797167454,
+                  "observed": 0.7522123893805309
+                },
+                {
+                  "bucket": 2,
+                  "trials": 305,
+                  "predicted": 0.25592699654752055,
+                  "observed": 0.8
+                },
+                {
+                  "bucket": 3,
+                  "trials": 581,
+                  "predicted": 0.3549139238486824,
+                  "observed": 0.8364888123924269
+                },
+                {
+                  "bucket": 4,
+                  "trials": 882,
+                  "predicted": 0.45231307858994724,
+                  "observed": 0.8537414965986394
+                },
+                {
+                  "bucket": 5,
+                  "trials": 992,
+                  "predicted": 0.5500359667510993,
+                  "observed": 0.8719758064516129
+                },
+                {
+                  "bucket": 6,
+                  "trials": 1082,
+                  "predicted": 0.6506857036073485,
+                  "observed": 0.8798521256931608
+                },
+                {
+                  "bucket": 7,
+                  "trials": 1090,
+                  "predicted": 0.7499746095206311,
+                  "observed": 0.9027522935779817
+                },
+                {
+                  "bucket": 8,
+                  "trials": 1332,
+                  "predicted": 0.850057645101829,
+                  "observed": 0.9459459459459459
+                },
+                {
+                  "bucket": 9,
+                  "trials": 1107,
+                  "predicted": 0.9263914826646341,
+                  "observed": 0.983739837398374
+                }
+              ]
+            },
+            {
+              "group": 2,
+              "events": 26,
+              "residual": 0.09315665386138886,
+              "brier": 0.20838588460765398,
+              "log_loss": 0.6020485675119689,
+              "trial_weight": 15465,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 107,
+                  "predicted": 0.06434028243676757,
+                  "observed": 0.5327102803738317
+                },
+                {
+                  "bucket": 1,
+                  "trials": 335,
+                  "predicted": 0.15872495545485257,
+                  "observed": 0.564179104477612
+                },
+                {
+                  "bucket": 2,
+                  "trials": 751,
+                  "predicted": 0.25536524992703286,
+                  "observed": 0.5818908122503329
+                },
+                {
+                  "bucket": 3,
+                  "trials": 1430,
+                  "predicted": 0.35494866434246675,
+                  "observed": 0.5748251748251748
+                },
+                {
+                  "bucket": 4,
+                  "trials": 2249,
+                  "predicted": 0.45188275669481653,
+                  "observed": 0.5820364606491775
+                },
+                {
+                  "bucket": 5,
+                  "trials": 2328,
+                  "predicted": 0.5491613155566794,
+                  "observed": 0.6408934707903781
+                },
+                {
+                  "bucket": 6,
+                  "trials": 2263,
+                  "predicted": 0.6506827278687576,
+                  "observed": 0.6933274414494034
+                },
+                {
+                  "bucket": 7,
+                  "trials": 2044,
+                  "predicted": 0.749762147611759,
+                  "observed": 0.7783757338551859
+                },
+                {
+                  "bucket": 8,
+                  "trials": 2150,
+                  "predicted": 0.8478786607959329,
+                  "observed": 0.8497674418604652
+                },
+                {
+                  "bucket": 9,
+                  "trials": 1808,
+                  "predicted": 0.9254642472407638,
+                  "observed": 0.941924778761062
+                }
+              ]
+            },
+            {
+              "group": 3,
+              "events": 40,
+              "residual": -0.07959328928877592,
+              "brier": 0.22223994906848413,
+              "log_loss": 0.638708293218517,
+              "trial_weight": 17758,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 265,
+                  "predicted": 0.06383625183735726,
+                  "observed": 0.3169811320754717
+                },
+                {
+                  "bucket": 1,
+                  "trials": 802,
+                  "predicted": 0.15691742861782995,
+                  "observed": 0.2855361596009975
+                },
+                {
+                  "bucket": 2,
+                  "trials": 1549,
+                  "predicted": 0.2532982832924787,
+                  "observed": 0.25564880568108456
+                },
+                {
+                  "bucket": 3,
+                  "trials": 2407,
+                  "predicted": 0.3527765612230427,
+                  "observed": 0.2775238886580806
+                },
+                {
+                  "bucket": 4,
+                  "trials": 3094,
+                  "predicted": 0.4505097022534847,
+                  "observed": 0.33710407239819007
+                },
+                {
+                  "bucket": 5,
+                  "trials": 2622,
+                  "predicted": 0.5485109972671667,
+                  "observed": 0.41495041952707856
+                },
+                {
+                  "bucket": 6,
+                  "trials": 2280,
+                  "predicted": 0.6498566111708627,
+                  "observed": 0.5197368421052632
+                },
+                {
+                  "bucket": 7,
+                  "trials": 1769,
+                  "predicted": 0.7496593512563222,
+                  "observed": 0.6331260599208592
+                },
+                {
+                  "bucket": 8,
+                  "trials": 1741,
+                  "predicted": 0.8478105170089146,
+                  "observed": 0.7512923607122344
+                },
+                {
+                  "bucket": 9,
+                  "trials": 1229,
+                  "predicted": 0.9253292054161567,
+                  "observed": 0.8974776240846216
+                }
+              ]
+            },
+            {
+              "group": 4,
+              "events": 39,
+              "residual": -0.11158660719565835,
+              "brier": 0.13707429022845724,
+              "log_loss": 0.4237843898452557,
+              "trial_weight": 35532,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 10379,
+                  "predicted": 0.0377161894768822,
+                  "observed": 0.03439637730031795
+                },
+                {
+                  "bucket": 1,
+                  "trials": 5440,
+                  "predicted": 0.14854206845733883,
+                  "observed": 0.10625
+                },
+                {
+                  "bucket": 2,
+                  "trials": 4912,
+                  "predicted": 0.2481547234256173,
+                  "observed": 0.14474755700325734
+                },
+                {
+                  "bucket": 3,
+                  "trials": 4403,
+                  "predicted": 0.34862729693319433,
+                  "observed": 0.1594367476720418
+                },
+                {
+                  "bucket": 4,
+                  "trials": 3481,
+                  "predicted": 0.44818832669033354,
+                  "observed": 0.20798621085894858
+                },
+                {
+                  "bucket": 5,
+                  "trials": 2347,
+                  "predicted": 0.5471158123630615,
+                  "observed": 0.2786536003408607
+                },
+                {
+                  "bucket": 6,
+                  "trials": 1718,
+                  "predicted": 0.64767059259467,
+                  "observed": 0.3917345750873108
+                },
+                {
+                  "bucket": 7,
+                  "trials": 1232,
+                  "predicted": 0.7475132547105269,
+                  "observed": 0.512987012987013
+                },
+                {
+                  "bucket": 8,
+                  "trials": 1040,
+                  "predicted": 0.8469472949193324,
+                  "observed": 0.7048076923076924
+                },
+                {
+                  "bucket": 9,
+                  "trials": 580,
+                  "predicted": 0.9219727286239453,
+                  "observed": 0.8931034482758621
+                }
+              ]
+            }
+          ],
+          "market_types": [
+            {
+              "group": "KXNFLGAME",
+              "events": 40,
+              "residual": -0.0184522488572684,
+              "brier": 0.1740264006217639,
+              "log_loss": 0.5168550667173363,
+              "trial_weight": 78615,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 10775,
+                  "predicted": 0.03869824667262055,
+                  "observed": 0.047610208816705336
+                },
+                {
+                  "bucket": 1,
+                  "trials": 6711,
+                  "predicted": 0.15031602389961415,
+                  "observed": 0.16405900759946357
+                },
+                {
+                  "bucket": 2,
+                  "trials": 7597,
+                  "predicted": 0.25034267250348946,
+                  "observed": 0.24536001053047254
+                },
+                {
+                  "bucket": 3,
+                  "trials": 8992,
+                  "predicted": 0.3512917067415039,
+                  "observed": 0.3153914590747331
+                },
+                {
+                  "bucket": 4,
+                  "trials": 9948,
+                  "predicted": 0.45023655029274884,
+                  "observed": 0.4083232810615199
+                },
+                {
+                  "bucket": 5,
+                  "trials": 8577,
+                  "predicted": 0.5486007451023712,
+                  "observed": 0.5103182931094788
+                },
+                {
+                  "bucket": 6,
+                  "trials": 7672,
+                  "predicted": 0.6497340494380283,
+                  "observed": 0.6119655891553701
+                },
+                {
+                  "bucket": 7,
+                  "trials": 6520,
+                  "predicted": 0.7493788587353808,
+                  "observed": 0.7202453987730061
+                },
+                {
+                  "bucket": 8,
+                  "trials": 6741,
+                  "predicted": 0.8484121965573865,
+                  "observed": 0.8307372793354102
+                },
+                {
+                  "bucket": 9,
+                  "trials": 5082,
+                  "predicted": 0.9250398648771868,
+                  "observed": 0.9380165289256198
+                }
+              ]
+            }
+          ],
+          "within_distance_time_price_effect": {
+            "status": "estimated",
+            "overlapping_bins": 1124,
+            "events": 40,
+            "residual_per_unit_price": -0.8212674500142053,
+            "cluster_standard_error": 0.12790982932931258,
+            "interval_95": [
+              -1.071970715499658,
+              -0.5705641845287527
+            ]
+          }
+        },
+        "note": "Event groups are disjoint. Repeated states/bids remain dependent; final displayed fit uses all eligible games.",
+        "strengths": [
+          1e-06,
+          1e-06
+        ],
+        "optimizer_converged": true,
+        "basis_functions": [
+          12,
+          9
+        ],
+        "training_distance_range": [
+          0.04000533461369919,
+          9.190239700269178
+        ],
+        "weighting": "Summed actual hits / state-bid trials; correlated bids are not independent games."
+      },
+      "supported_grid_cells": 2188,
+      "grid_resolution": 51,
+      "runtime_seconds": 2.6
+    },
+    {
+      "family": "KXNCAAFGAME",
+      "version": "odds-moneyness-1",
+      "bounds": [
+        0.0,
+        9.190239700269178
+      ],
+      "audit": {
+        "source_states": 35170,
+        "eligible_states": 35170,
+        "excluded_states": 0,
+        "endpoint_prices": 0,
+        "invalid_prices": 0,
+        "ended_horizon": 0,
+        "bid_trials": 1740159,
+        "side": "YES; upstream NO-taker prices complemented once",
+        "negative_distance": "Excluded: production bids must be strictly below current price.",
+        "source_distance_range": [
+          0.04000533461369919,
+          9.190239700269178
+        ]
+      },
+      "validation": {
+        "status": "whole-game tuning + independent test",
+        "reason": "Need at least 30 games, 10 training, 5 tuning and 5 independent test games.",
+        "model_version": "odds-moneyness-1",
+        "features": [
+          "log_odds_distance",
+          "normalized_time"
+        ],
+        "monotonic_distance": true,
+        "monotonicity_reason": "A farther below-market bid requires a lower future minimum under the same price-reaching horizon; pooled-price departures are checked in residual diagnostics.",
+        "empirical_distance_slope": -0.13636048644711782,
+        "train_events": 502,
+        "tuning_events": 193,
+        "test_events": 185,
+        "candidates": [
+          {
+            "strengths": [
+              1e-06,
+              1e-06
+            ],
+            "converged": true,
+            "brier": 0.1433235008160123,
+            "log_loss": 0.43700028645224825,
+            "trial_weight": 381479,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 109279,
+                "predicted": 0.037787560033334416,
+                "observed": 0.037619304715453106
+              },
+              {
+                "bucket": 1,
+                "trials": 49515,
+                "predicted": 0.14708483855382465,
+                "observed": 0.15197414924770272
+              },
+              {
+                "bucket": 2,
+                "trials": 38462,
+                "predicted": 0.248917293100651,
+                "observed": 0.2537309552285373
+              },
+              {
+                "bucket": 3,
+                "trials": 34045,
+                "predicted": 0.34912117035849766,
+                "observed": 0.34974298722279334
+              },
+              {
+                "bucket": 4,
+                "trials": 30926,
+                "predicted": 0.44860697425467727,
+                "observed": 0.44784323869882947
+              },
+              {
+                "bucket": 5,
+                "trials": 28411,
+                "predicted": 0.5490558425919091,
+                "observed": 0.5390869733553905
+              },
+              {
+                "bucket": 6,
+                "trials": 25429,
+                "predicted": 0.6496772035407471,
+                "observed": 0.6405285304180267
+              },
+              {
+                "bucket": 7,
+                "trials": 23885,
+                "predicted": 0.7482436480527418,
+                "observed": 0.7265647896169144
+              },
+              {
+                "bucket": 8,
+                "trials": 25073,
+                "predicted": 0.8488021058376027,
+                "observed": 0.8410640928488813
+              },
+              {
+                "bucket": 9,
+                "trials": 16454,
+                "predicted": 0.9227977073360023,
+                "observed": 0.9369758113528626
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.0001,
+              0.0001
+            ],
+            "converged": true,
+            "brier": 0.14399905890876297,
+            "log_loss": 0.44020081444529374,
+            "trial_weight": 381479,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 113304,
+                "predicted": 0.03611505702959773,
+                "observed": 0.04196674433382758
+              },
+              {
+                "bucket": 1,
+                "trials": 45464,
+                "predicted": 0.1464870294732914,
+                "observed": 0.15517772303360902
+              },
+              {
+                "bucket": 2,
+                "trials": 35093,
+                "predicted": 0.24850197093697243,
+                "observed": 0.24668737355028067
+              },
+              {
+                "bucket": 3,
+                "trials": 31604,
+                "predicted": 0.3492981535417511,
+                "observed": 0.3370459435514492
+              },
+              {
+                "bucket": 4,
+                "trials": 30841,
+                "predicted": 0.4499084874068698,
+                "observed": 0.4244998540903343
+              },
+              {
+                "bucket": 5,
+                "trials": 29917,
+                "predicted": 0.5500588247347422,
+                "observed": 0.5282615235484841
+              },
+              {
+                "bucket": 6,
+                "trials": 30025,
+                "predicted": 0.6501879873511642,
+                "observed": 0.626977518734388
+              },
+              {
+                "bucket": 7,
+                "trials": 30179,
+                "predicted": 0.7513526899839036,
+                "observed": 0.745253321846317
+              },
+              {
+                "bucket": 8,
+                "trials": 30710,
+                "predicted": 0.853559788609222,
+                "observed": 0.8822533376750245
+              },
+              {
+                "bucket": 9,
+                "trials": 4342,
+                "predicted": 0.9062181267502316,
+                "observed": 0.9649930907415938
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.01,
+              0.01
+            ],
+            "converged": false,
+            "brier": 0.1456518529033319,
+            "log_loss": 0.44752065207902736,
+            "trial_weight": 381479,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 119821,
+                "predicted": 0.03646072107789191,
+                "observed": 0.0506171706128308
+              },
+              {
+                "bucket": 1,
+                "trials": 44489,
+                "predicted": 0.1461393109010614,
+                "observed": 0.1634561352244375
+              },
+              {
+                "bucket": 2,
+                "trials": 32478,
+                "predicted": 0.24834491141412915,
+                "observed": 0.25250939097235053
+              },
+              {
+                "bucket": 3,
+                "trials": 28485,
+                "predicted": 0.34939087293249266,
+                "observed": 0.3353694927154643
+              },
+              {
+                "bucket": 4,
+                "trials": 27036,
+                "predicted": 0.44991240321653914,
+                "observed": 0.41962568427282143
+              },
+              {
+                "bucket": 5,
+                "trials": 26469,
+                "predicted": 0.5499808326744192,
+                "observed": 0.5076504590275417
+              },
+              {
+                "bucket": 6,
+                "trials": 27040,
+                "predicted": 0.6504358864587425,
+                "observed": 0.5987056213017752
+              },
+              {
+                "bucket": 7,
+                "trials": 27907,
+                "predicted": 0.7501174019534137,
+                "observed": 0.7044110796574337
+              },
+              {
+                "bucket": 8,
+                "trials": 31601,
+                "predicted": 0.8513281727746594,
+                "observed": 0.8231068637068447
+              },
+              {
+                "bucket": 9,
+                "trials": 16153,
+                "predicted": 0.9267460459896237,
+                "observed": 0.9214387420293444
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.0001,
+              1e-06
+            ],
+            "converged": true,
+            "brier": 0.1436058732356781,
+            "log_loss": 0.4385055382435984,
+            "trial_weight": 381479,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 113636,
+                "predicted": 0.03530925706611455,
+                "observed": 0.04086733077545848
+              },
+              {
+                "bucket": 1,
+                "trials": 45136,
+                "predicted": 0.14678648418114826,
+                "observed": 0.15639400921658986
+              },
+              {
+                "bucket": 2,
+                "trials": 34894,
+                "predicted": 0.2483593672090298,
+                "observed": 0.24686192468619247
+              },
+              {
+                "bucket": 3,
+                "trials": 31707,
+                "predicted": 0.3492165300787106,
+                "observed": 0.33610874570284166
+              },
+              {
+                "bucket": 4,
+                "trials": 30464,
+                "predicted": 0.4495022663021782,
+                "observed": 0.42450105042016806
+              },
+              {
+                "bucket": 5,
+                "trials": 29952,
+                "predicted": 0.5491424415171361,
+                "observed": 0.5280448717948718
+              },
+              {
+                "bucket": 6,
+                "trials": 30027,
+                "predicted": 0.6495084410496395,
+                "observed": 0.6291337795983615
+              },
+              {
+                "bucket": 7,
+                "trials": 29950,
+                "predicted": 0.7504228235714953,
+                "observed": 0.7408681135225376
+              },
+              {
+                "bucket": 8,
+                "trials": 31355,
+                "predicted": 0.8536718246178779,
+                "observed": 0.8807207781852974
+              },
+              {
+                "bucket": 9,
+                "trials": 4358,
+                "predicted": 0.9068976841950384,
+                "observed": 0.963285910968334
+              }
+            ]
+          },
+          {
+            "strengths": [
+              1e-06,
+              0.0001
+            ],
+            "converged": false,
+            "brier": 0.14372163120969186,
+            "log_loss": 0.4387166230263388,
+            "trial_weight": 381479,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 110162,
+                "predicted": 0.03938683647785873,
+                "observed": 0.03919681922986148
+              },
+              {
+                "bucket": 1,
+                "trials": 48840,
+                "predicted": 0.1476737121953304,
+                "observed": 0.15333742833742833
+              },
+              {
+                "bucket": 2,
+                "trials": 38525,
+                "predicted": 0.24929684966358245,
+                "observed": 0.2522258273848151
+              },
+              {
+                "bucket": 3,
+                "trials": 34206,
+                "predicted": 0.34959238787166824,
+                "observed": 0.3515172776705841
+              },
+              {
+                "bucket": 4,
+                "trials": 30754,
+                "predicted": 0.4490861671393984,
+                "observed": 0.44543799180594396
+              },
+              {
+                "bucket": 5,
+                "trials": 27996,
+                "predicted": 0.5490815024231318,
+                "observed": 0.5463637662523217
+              },
+              {
+                "bucket": 6,
+                "trials": 25868,
+                "predicted": 0.6501060773876179,
+                "observed": 0.6322483377145508
+              },
+              {
+                "bucket": 7,
+                "trials": 24364,
+                "predicted": 0.7497531034210525,
+                "observed": 0.7323099655229026
+              },
+              {
+                "bucket": 8,
+                "trials": 25487,
+                "predicted": 0.8506913173841669,
+                "observed": 0.8451367363754071
+              },
+              {
+                "bucket": 9,
+                "trials": 15277,
+                "predicted": 0.9214438304247468,
+                "observed": 0.9383386790600249
+              }
+            ]
+          }
+        ],
+        "selected_tuning": {
+          "strengths": [
+            1e-06,
+            1e-06
+          ],
+          "converged": true,
+          "brier": 0.1433235008160123,
+          "log_loss": 0.43700028645224825,
+          "trial_weight": 381479,
+          "calibration": [
+            {
+              "bucket": 0,
+              "trials": 109279,
+              "predicted": 0.037787560033334416,
+              "observed": 0.037619304715453106
+            },
+            {
+              "bucket": 1,
+              "trials": 49515,
+              "predicted": 0.14708483855382465,
+              "observed": 0.15197414924770272
+            },
+            {
+              "bucket": 2,
+              "trials": 38462,
+              "predicted": 0.248917293100651,
+              "observed": 0.2537309552285373
+            },
+            {
+              "bucket": 3,
+              "trials": 34045,
+              "predicted": 0.34912117035849766,
+              "observed": 0.34974298722279334
+            },
+            {
+              "bucket": 4,
+              "trials": 30926,
+              "predicted": 0.44860697425467727,
+              "observed": 0.44784323869882947
+            },
+            {
+              "bucket": 5,
+              "trials": 28411,
+              "predicted": 0.5490558425919091,
+              "observed": 0.5390869733553905
+            },
+            {
+              "bucket": 6,
+              "trials": 25429,
+              "predicted": 0.6496772035407471,
+              "observed": 0.6405285304180267
+            },
+            {
+              "bucket": 7,
+              "trials": 23885,
+              "predicted": 0.7482436480527418,
+              "observed": 0.7265647896169144
+            },
+            {
+              "bucket": 8,
+              "trials": 25073,
+              "predicted": 0.8488021058376027,
+              "observed": 0.8410640928488813
+            },
+            {
+              "bucket": 9,
+              "trials": 16454,
+              "predicted": 0.9227977073360023,
+              "observed": 0.9369758113528626
+            }
+          ]
+        },
+        "test_metrics": {
+          "brier": 0.13704785751924753,
+          "log_loss": 0.42161108846097933,
+          "trial_weight": 365772,
+          "calibration": [
+            {
+              "bucket": 0,
+              "trials": 108949,
+              "predicted": 0.038023337880473664,
+              "observed": 0.035264206188216504
+            },
+            {
+              "bucket": 1,
+              "trials": 49466,
+              "predicted": 0.14640414919818429,
+              "observed": 0.13617434197226377
+            },
+            {
+              "bucket": 2,
+              "trials": 37703,
+              "predicted": 0.24816387965919606,
+              "observed": 0.23162613054664086
+            },
+            {
+              "bucket": 3,
+              "trials": 32457,
+              "predicted": 0.3487323105624398,
+              "observed": 0.3310533937209231
+            },
+            {
+              "bucket": 4,
+              "trials": 29199,
+              "predicted": 0.4485735452159826,
+              "observed": 0.4304941950066783
+            },
+            {
+              "bucket": 5,
+              "trials": 25964,
+              "predicted": 0.5490583209341235,
+              "observed": 0.5285395162532738
+            },
+            {
+              "bucket": 6,
+              "trials": 23323,
+              "predicted": 0.6490372791794881,
+              "observed": 0.6395403678772028
+            },
+            {
+              "bucket": 7,
+              "trials": 21484,
+              "predicted": 0.7472591673362119,
+              "observed": 0.7346397318935022
+            },
+            {
+              "bucket": 8,
+              "trials": 23041,
+              "predicted": 0.8486242475193285,
+              "observed": 0.8483138752658305
+            },
+            {
+              "bucket": 9,
+              "trials": 14186,
+              "predicted": 0.9227978113891449,
+              "observed": 0.9400817707599042
+            }
+          ]
+        },
+        "test_optimizer_converged": true,
+        "diagnostics": {
+          "price_bands": [
+            {
+              "group": 0,
+              "events": 180,
+              "residual": 0.2756650338957665,
+              "brier": 0.15494205147596696,
+              "log_loss": 0.4732744305238578,
+              "trial_weight": 11047,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 17,
+                  "predicted": 0.07759008290125513,
+                  "observed": 0.8823529411764706
+                },
+                {
+                  "bucket": 1,
+                  "trials": 134,
+                  "predicted": 0.165190231714093,
+                  "observed": 0.8805970149253731
+                },
+                {
+                  "bucket": 2,
+                  "trials": 511,
+                  "predicted": 0.2552037271275315,
+                  "observed": 0.8669275929549902
+                },
+                {
+                  "bucket": 3,
+                  "trials": 778,
+                  "predicted": 0.3532517771619076,
+                  "observed": 0.9023136246786633
+                },
+                {
+                  "bucket": 4,
+                  "trials": 1056,
+                  "predicted": 0.45254734075544767,
+                  "observed": 0.9128787878787878
+                },
+                {
+                  "bucket": 5,
+                  "trials": 1323,
+                  "predicted": 0.5542473330927715,
+                  "observed": 0.9251700680272109
+                },
+                {
+                  "bucket": 6,
+                  "trials": 1464,
+                  "predicted": 0.651410830967196,
+                  "observed": 0.9371584699453552
+                },
+                {
+                  "bucket": 7,
+                  "trials": 1949,
+                  "predicted": 0.750276759568085,
+                  "observed": 0.9548486403283736
+                },
+                {
+                  "bucket": 8,
+                  "trials": 2397,
+                  "predicted": 0.8531046427093857,
+                  "observed": 0.9791405924071757
+                },
+                {
+                  "bucket": 9,
+                  "trials": 1418,
+                  "predicted": 0.9210359364402436,
+                  "observed": 0.9915373765867419
+                }
+              ]
+            },
+            {
+              "group": 1,
+              "events": 131,
+              "residual": 0.24457236809565022,
+              "brier": 0.19386835051352447,
+              "log_loss": 0.5694389553894048,
+              "trial_weight": 24127,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 190,
+                  "predicted": 0.07261926879548852,
+                  "observed": 0.8105263157894737
+                },
+                {
+                  "bucket": 1,
+                  "trials": 1031,
+                  "predicted": 0.15541074091501078,
+                  "observed": 0.7536372453928225
+                },
+                {
+                  "bucket": 2,
+                  "trials": 1443,
+                  "predicted": 0.2523004719269548,
+                  "observed": 0.7893277893277894
+                },
+                {
+                  "bucket": 3,
+                  "trials": 1963,
+                  "predicted": 0.3522963767391333,
+                  "observed": 0.8074375955170657
+                },
+                {
+                  "bucket": 4,
+                  "trials": 2422,
+                  "predicted": 0.4516414185253082,
+                  "observed": 0.8340214698596201
+                },
+                {
+                  "bucket": 5,
+                  "trials": 2759,
+                  "predicted": 0.5504958279959701,
+                  "observed": 0.8452337803552011
+                },
+                {
+                  "bucket": 6,
+                  "trials": 3217,
+                  "predicted": 0.6500417820331765,
+                  "observed": 0.8694435809760647
+                },
+                {
+                  "bucket": 7,
+                  "trials": 3420,
+                  "predicted": 0.7487202605241718,
+                  "observed": 0.8994152046783626
+                },
+                {
+                  "bucket": 8,
+                  "trials": 4448,
+                  "predicted": 0.8498245166954272,
+                  "observed": 0.9332284172661871
+                },
+                {
+                  "bucket": 9,
+                  "trials": 3234,
+                  "predicted": 0.9242511788213911,
+                  "observed": 0.968769325912183
+                }
+              ]
+            },
+            {
+              "group": 2,
+              "events": 90,
+              "residual": 0.14617252736638822,
+              "brier": 0.2155040975560818,
+              "log_loss": 0.6249949799146881,
+              "trial_weight": 38092,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 942,
+                  "predicted": 0.06850992506053195,
+                  "observed": 0.4830148619957537
+                },
+                {
+                  "bucket": 1,
+                  "trials": 2246,
+                  "predicted": 0.15236145945602617,
+                  "observed": 0.5382902938557436
+                },
+                {
+                  "bucket": 2,
+                  "trials": 2980,
+                  "predicted": 0.2528676273315972,
+                  "observed": 0.5697986577181208
+                },
+                {
+                  "bucket": 3,
+                  "trials": 3659,
+                  "predicted": 0.35174119616453164,
+                  "observed": 0.5998906805138016
+                },
+                {
+                  "bucket": 4,
+                  "trials": 4391,
+                  "predicted": 0.4503449857438138,
+                  "observed": 0.6294693691641995
+                },
+                {
+                  "bucket": 5,
+                  "trials": 4713,
+                  "predicted": 0.5506577103901552,
+                  "observed": 0.683004455760662
+                },
+                {
+                  "bucket": 6,
+                  "trials": 4857,
+                  "predicted": 0.6506713755927087,
+                  "observed": 0.7570516779905291
+                },
+                {
+                  "bucket": 7,
+                  "trials": 4817,
+                  "predicted": 0.7480087646610896,
+                  "observed": 0.8065185800290637
+                },
+                {
+                  "bucket": 8,
+                  "trials": 5526,
+                  "predicted": 0.8479719065714374,
+                  "observed": 0.8749547593195802
+                },
+                {
+                  "bucket": 9,
+                  "trials": 3961,
+                  "predicted": 0.9229015062333241,
+                  "observed": 0.948245392577632
+                }
+              ]
+            },
+            {
+              "group": 3,
+              "events": 124,
+              "residual": 0.0002871307230132994,
+              "brier": 0.21897363349412388,
+              "log_loss": 0.6340739985466443,
+              "trial_weight": 58393,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 2881,
+                  "predicted": 0.06260835024204663,
+                  "observed": 0.23776466504685873
+                },
+                {
+                  "bucket": 1,
+                  "trials": 5120,
+                  "predicted": 0.15200952080395572,
+                  "observed": 0.2796875
+                },
+                {
+                  "bucket": 2,
+                  "trials": 6407,
+                  "predicted": 0.2514220334305129,
+                  "observed": 0.3287029811144061
+                },
+                {
+                  "bucket": 3,
+                  "trials": 7194,
+                  "predicted": 0.35040514419490526,
+                  "observed": 0.37503475118154017
+                },
+                {
+                  "bucket": 4,
+                  "trials": 7613,
+                  "predicted": 0.4490614431445722,
+                  "observed": 0.4295284381978195
+                },
+                {
+                  "bucket": 5,
+                  "trials": 7143,
+                  "predicted": 0.5488921316014321,
+                  "observed": 0.49769004619907603
+                },
+                {
+                  "bucket": 6,
+                  "trials": 6597,
+                  "predicted": 0.648741307075873,
+                  "observed": 0.5811732605729877
+                },
+                {
+                  "bucket": 7,
+                  "trials": 5745,
+                  "predicted": 0.7465745787730799,
+                  "observed": 0.6701479547432551
+                },
+                {
+                  "bucket": 8,
+                  "trials": 6067,
+                  "predicted": 0.8476864331615404,
+                  "observed": 0.7880336245261249
+                },
+                {
+                  "bucket": 9,
+                  "trials": 3626,
+                  "predicted": 0.923530718722959,
+                  "observed": 0.9089906232763376
+                }
+              ]
+            },
+            {
+              "group": 4,
+              "events": 184,
+              "residual": -0.07624532502356231,
+              "brier": 0.09714818459592912,
+              "log_loss": 0.317853442422367,
+              "trial_weight": 234113,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 104919,
+                  "predicted": 0.03700547031333605,
+                  "observed": 0.024142433686939448
+                },
+                {
+                  "bucket": 1,
+                  "trials": 40935,
+                  "predicted": 0.145087848903135,
+                  "observed": 0.07817271283742519
+                },
+                {
+                  "bucket": 2,
+                  "trials": 26362,
+                  "predicted": 0.24647741338291665,
+                  "observed": 0.12696305287914422
+                },
+                {
+                  "bucket": 3,
+                  "trials": 18863,
+                  "predicted": 0.3469533631792428,
+                  "observed": 0.18899432751948259
+                },
+                {
+                  "bucket": 4,
+                  "trials": 13717,
+                  "predicted": 0.4468880834143553,
+                  "observed": 0.25894874972661663
+                },
+                {
+                  "bucket": 5,
+                  "trials": 10026,
+                  "predicted": 0.5473445789460537,
+                  "observed": 0.3384201077199282
+                },
+                {
+                  "bucket": 6,
+                  "trials": 7188,
+                  "predicted": 0.6472717472082882,
+                  "observed": 0.4501947690595437
+                },
+                {
+                  "bucket": 7,
+                  "trials": 5553,
+                  "predicted": 0.7453581993942912,
+                  "observed": 0.5602377093462994
+                },
+                {
+                  "bucket": 8,
+                  "trials": 4603,
+                  "predicted": 0.8471504806761595,
+                  "observed": 0.7456006951987834
+                },
+                {
+                  "bucket": 9,
+                  "trials": 1947,
+                  "predicted": 0.9200910271731477,
+                  "observed": 0.8962506420133539
+                }
+              ]
+            }
+          ],
+          "market_types": [
+            {
+              "group": "KXNCAAFGAME",
+              "events": 185,
+              "residual": -0.009074457000540178,
+              "brier": 0.13704785751924753,
+              "log_loss": 0.42161108846097933,
+              "trial_weight": 365772,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 108949,
+                  "predicted": 0.038023337880473664,
+                  "observed": 0.035264206188216504
+                },
+                {
+                  "bucket": 1,
+                  "trials": 49466,
+                  "predicted": 0.14640414919818429,
+                  "observed": 0.13617434197226377
+                },
+                {
+                  "bucket": 2,
+                  "trials": 37703,
+                  "predicted": 0.24816387965919606,
+                  "observed": 0.23162613054664086
+                },
+                {
+                  "bucket": 3,
+                  "trials": 32457,
+                  "predicted": 0.3487323105624398,
+                  "observed": 0.3310533937209231
+                },
+                {
+                  "bucket": 4,
+                  "trials": 29199,
+                  "predicted": 0.4485735452159826,
+                  "observed": 0.4304941950066783
+                },
+                {
+                  "bucket": 5,
+                  "trials": 25964,
+                  "predicted": 0.5490583209341235,
+                  "observed": 0.5285395162532738
+                },
+                {
+                  "bucket": 6,
+                  "trials": 23323,
+                  "predicted": 0.6490372791794881,
+                  "observed": 0.6395403678772028
+                },
+                {
+                  "bucket": 7,
+                  "trials": 21484,
+                  "predicted": 0.7472591673362119,
+                  "observed": 0.7346397318935022
+                },
+                {
+                  "bucket": 8,
+                  "trials": 23041,
+                  "predicted": 0.8486242475193285,
+                  "observed": 0.8483138752658305
+                },
+                {
+                  "bucket": 9,
+                  "trials": 14186,
+                  "predicted": 0.9227978113891449,
+                  "observed": 0.9400817707599042
+                }
+              ]
+            }
+          ],
+          "within_distance_time_price_effect": {
+            "status": "estimated",
+            "overlapping_bins": 1186,
+            "events": 185,
+            "residual_per_unit_price": -0.7619714273492765,
+            "cluster_standard_error": 0.04045821252032408,
+            "interval_95": [
+              -0.8412695238891117,
+              -0.6826733308094413
+            ]
+          }
+        },
+        "note": "Event groups are disjoint. Repeated states/bids remain dependent; final displayed fit uses all eligible games.",
+        "strengths": [
+          1e-06,
+          1e-06
+        ],
+        "optimizer_converged": true,
+        "basis_functions": [
+          12,
+          9
+        ],
+        "training_distance_range": [
+          0.04000533461369919,
+          9.190239700269178
+        ],
+        "weighting": "Summed actual hits / state-bid trials; correlated bids are not independent games."
+      },
+      "supported_grid_cells": 2450,
+      "grid_resolution": 51,
+      "runtime_seconds": 8.3
+    },
+    {
+      "family": "KXNBAGAME",
+      "version": "odds-moneyness-1",
+      "bounds": [
+        0.0,
+        9.190239700269178
+      ],
+      "audit": {
+        "source_states": 28646,
+        "eligible_states": 28646,
+        "excluded_states": 0,
+        "endpoint_prices": 0,
+        "invalid_prices": 0,
+        "ended_horizon": 0,
+        "bid_trials": 1413902,
+        "side": "YES; upstream NO-taker prices complemented once",
+        "negative_distance": "Excluded: production bids must be strictly below current price.",
+        "source_distance_range": [
+          0.04000533461369919,
+          9.190239700269178
+        ]
+      },
+      "validation": {
+        "status": "whole-game tuning + independent test",
+        "reason": "Need at least 30 games, 10 training, 5 tuning and 5 independent test games.",
+        "model_version": "odds-moneyness-1",
+        "features": [
+          "log_odds_distance",
+          "normalized_time"
+        ],
+        "monotonic_distance": true,
+        "monotonicity_reason": "A farther below-market bid requires a lower future minimum under the same price-reaching horizon; pooled-price departures are checked in residual diagnostics.",
+        "empirical_distance_slope": -0.1390871428363519,
+        "train_events": 428,
+        "tuning_events": 159,
+        "test_events": 140,
+        "candidates": [
+          {
+            "strengths": [
+              1e-06,
+              1e-06
+            ],
+            "converged": true,
+            "brier": 0.15294205282233217,
+            "log_loss": 0.4592874865528544,
+            "trial_weight": 308469,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 66028,
+                "predicted": 0.03238551203326044,
+                "observed": 0.021415157206033805
+              },
+              {
+                "bucket": 1,
+                "trials": 30965,
+                "predicted": 0.15002416877982297,
+                "observed": 0.1181979654448571
+              },
+              {
+                "bucket": 2,
+                "trials": 33537,
+                "predicted": 0.2506161655727024,
+                "observed": 0.22092017771416644
+              },
+              {
+                "bucket": 3,
+                "trials": 35529,
+                "predicted": 0.3498309947265437,
+                "observed": 0.3151228573841088
+              },
+              {
+                "bucket": 4,
+                "trials": 33133,
+                "predicted": 0.4497021484200761,
+                "observed": 0.4194307789816799
+              },
+              {
+                "bucket": 5,
+                "trials": 28414,
+                "predicted": 0.5507167536370359,
+                "observed": 0.5237558949813472
+              },
+              {
+                "bucket": 6,
+                "trials": 23507,
+                "predicted": 0.6493376741486332,
+                "observed": 0.6171353213936275
+              },
+              {
+                "bucket": 7,
+                "trials": 22496,
+                "predicted": 0.7486940815447545,
+                "observed": 0.7162162162162162
+              },
+              {
+                "bucket": 8,
+                "trials": 23269,
+                "predicted": 0.8531147161562914,
+                "observed": 0.8341140573294942
+              },
+              {
+                "bucket": 9,
+                "trials": 11591,
+                "predicted": 0.9218647884061383,
+                "observed": 0.9433180916228108
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.0001,
+              0.0001
+            ],
+            "converged": true,
+            "brier": 0.15409878148124884,
+            "log_loss": 0.4630326286399245,
+            "trial_weight": 308469,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 71450,
+                "predicted": 0.03634039431760017,
+                "observed": 0.02820153953813856
+              },
+              {
+                "bucket": 1,
+                "trials": 31507,
+                "predicted": 0.1485336275548964,
+                "observed": 0.13431935760307234
+              },
+              {
+                "bucket": 2,
+                "trials": 27760,
+                "predicted": 0.2503421434930342,
+                "observed": 0.22878242074927954
+              },
+              {
+                "bucket": 3,
+                "trials": 27829,
+                "predicted": 0.35032448311226216,
+                "observed": 0.3059757806604621
+              },
+              {
+                "bucket": 4,
+                "trials": 29998,
+                "predicted": 0.4503570217371424,
+                "observed": 0.3894926328421895
+              },
+              {
+                "bucket": 5,
+                "trials": 31370,
+                "predicted": 0.5508381112637719,
+                "observed": 0.4932419509085113
+              },
+              {
+                "bucket": 6,
+                "trials": 31165,
+                "predicted": 0.6501691424530004,
+                "observed": 0.600192523664367
+              },
+              {
+                "bucket": 7,
+                "trials": 29583,
+                "predicted": 0.7492397188477843,
+                "observed": 0.732346279958084
+              },
+              {
+                "bucket": 8,
+                "trials": 27807,
+                "predicted": 0.8457683669648921,
+                "observed": 0.8911425180709893
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.01,
+              0.01
+            ],
+            "converged": false,
+            "brier": 0.1559022823387469,
+            "log_loss": 0.46831279252821817,
+            "trial_weight": 308469,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 72526,
+                "predicted": 0.040580581407868285,
+                "observed": 0.030871687394865288
+              },
+              {
+                "bucket": 1,
+                "trials": 34817,
+                "predicted": 0.14767040982037863,
+                "observed": 0.13993164258839072
+              },
+              {
+                "bucket": 2,
+                "trials": 28718,
+                "predicted": 0.2500037620426258,
+                "observed": 0.24183438958144718
+              },
+              {
+                "bucket": 3,
+                "trials": 27454,
+                "predicted": 0.3502180181204734,
+                "observed": 0.3274204123260727
+              },
+              {
+                "bucket": 4,
+                "trials": 28572,
+                "predicted": 0.45038729843544023,
+                "observed": 0.4118017639647207
+              },
+              {
+                "bucket": 5,
+                "trials": 29512,
+                "predicted": 0.5510873586151608,
+                "observed": 0.510673624288425
+              },
+              {
+                "bucket": 6,
+                "trials": 29433,
+                "predicted": 0.6503447922726504,
+                "observed": 0.6161451432066049
+              },
+              {
+                "bucket": 7,
+                "trials": 30237,
+                "predicted": 0.7495957421343593,
+                "observed": 0.724245130138572
+              },
+              {
+                "bucket": 8,
+                "trials": 24696,
+                "predicted": 0.8441621546712591,
+                "observed": 0.8565759637188208
+              },
+              {
+                "bucket": 9,
+                "trials": 2504,
+                "predicted": 0.9100703482620887,
+                "observed": 0.9384984025559105
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.0001,
+              1e-06
+            ],
+            "converged": true,
+            "brier": 0.15383511905619293,
+            "log_loss": 0.4614802519459432,
+            "trial_weight": 308469,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 70976,
+                "predicted": 0.032773288389783495,
+                "observed": 0.025994702434625788
+              },
+              {
+                "bucket": 1,
+                "trials": 30771,
+                "predicted": 0.14852124628619584,
+                "observed": 0.1350622339215495
+              },
+              {
+                "bucket": 2,
+                "trials": 28070,
+                "predicted": 0.24950753385210797,
+                "observed": 0.22522265764161026
+              },
+              {
+                "bucket": 3,
+                "trials": 28471,
+                "predicted": 0.34985638395250107,
+                "observed": 0.30315057426855396
+              },
+              {
+                "bucket": 4,
+                "trials": 29971,
+                "predicted": 0.45007979785609137,
+                "observed": 0.3882419672349938
+              },
+              {
+                "bucket": 5,
+                "trials": 31499,
+                "predicted": 0.5500851659199704,
+                "observed": 0.4929045366519572
+              },
+              {
+                "bucket": 6,
+                "trials": 30998,
+                "predicted": 0.6501180115715626,
+                "observed": 0.6017162397574037
+              },
+              {
+                "bucket": 7,
+                "trials": 30029,
+                "predicted": 0.7502176383773455,
+                "observed": 0.731293083352759
+              },
+              {
+                "bucket": 8,
+                "trials": 27520,
+                "predicted": 0.8471002163789016,
+                "observed": 0.8913880813953489
+              },
+              {
+                "bucket": 9,
+                "trials": 164,
+                "predicted": 0.9011983460305114,
+                "observed": 0.9817073170731707
+              }
+            ]
+          },
+          {
+            "strengths": [
+              1e-06,
+              0.0001
+            ],
+            "converged": false,
+            "brier": 0.15318246456257525,
+            "log_loss": 0.460598626415211,
+            "trial_weight": 308469,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 67597,
+                "predicted": 0.03792720639031444,
+                "observed": 0.024157876828853352
+              },
+              {
+                "bucket": 1,
+                "trials": 31284,
+                "predicted": 0.14841249575715942,
+                "observed": 0.12325789540979415
+              },
+              {
+                "bucket": 2,
+                "trials": 31219,
+                "predicted": 0.2509213494796653,
+                "observed": 0.2234216342611871
+              },
+              {
+                "bucket": 3,
+                "trials": 35656,
+                "predicted": 0.34957674443246367,
+                "observed": 0.31391631142023785
+              },
+              {
+                "bucket": 4,
+                "trials": 33342,
+                "predicted": 0.4487189264012089,
+                "observed": 0.41716153800011996
+              },
+              {
+                "bucket": 5,
+                "trials": 28261,
+                "predicted": 0.5494339719626056,
+                "observed": 0.5260252644987793
+              },
+              {
+                "bucket": 6,
+                "trials": 24288,
+                "predicted": 0.6488980815465316,
+                "observed": 0.6126893939393939
+              },
+              {
+                "bucket": 7,
+                "trials": 21935,
+                "predicted": 0.7485929367022481,
+                "observed": 0.7174378846592204
+              },
+              {
+                "bucket": 8,
+                "trials": 23164,
+                "predicted": 0.8517801004615242,
+                "observed": 0.8342686927991712
+              },
+              {
+                "bucket": 9,
+                "trials": 11723,
+                "predicted": 0.9211563298738947,
+                "observed": 0.9421649748357929
+              }
+            ]
+          }
+        ],
+        "selected_tuning": {
+          "strengths": [
+            1e-06,
+            1e-06
+          ],
+          "converged": true,
+          "brier": 0.15294205282233217,
+          "log_loss": 0.4592874865528544,
+          "trial_weight": 308469,
+          "calibration": [
+            {
+              "bucket": 0,
+              "trials": 66028,
+              "predicted": 0.03238551203326044,
+              "observed": 0.021415157206033805
+            },
+            {
+              "bucket": 1,
+              "trials": 30965,
+              "predicted": 0.15002416877982297,
+              "observed": 0.1181979654448571
+            },
+            {
+              "bucket": 2,
+              "trials": 33537,
+              "predicted": 0.2506161655727024,
+              "observed": 0.22092017771416644
+            },
+            {
+              "bucket": 3,
+              "trials": 35529,
+              "predicted": 0.3498309947265437,
+              "observed": 0.3151228573841088
+            },
+            {
+              "bucket": 4,
+              "trials": 33133,
+              "predicted": 0.4497021484200761,
+              "observed": 0.4194307789816799
+            },
+            {
+              "bucket": 5,
+              "trials": 28414,
+              "predicted": 0.5507167536370359,
+              "observed": 0.5237558949813472
+            },
+            {
+              "bucket": 6,
+              "trials": 23507,
+              "predicted": 0.6493376741486332,
+              "observed": 0.6171353213936275
+            },
+            {
+              "bucket": 7,
+              "trials": 22496,
+              "predicted": 0.7486940815447545,
+              "observed": 0.7162162162162162
+            },
+            {
+              "bucket": 8,
+              "trials": 23269,
+              "predicted": 0.8531147161562914,
+              "observed": 0.8341140573294942
+            },
+            {
+              "bucket": 9,
+              "trials": 11591,
+              "predicted": 0.9218647884061383,
+              "observed": 0.9433180916228108
+            }
+          ]
+        },
+        "test_metrics": {
+          "brier": 0.15806558905281715,
+          "log_loss": 0.47224722187344403,
+          "trial_weight": 272656,
+          "calibration": [
+            {
+              "bucket": 0,
+              "trials": 57746,
+              "predicted": 0.03102202703309807,
+              "observed": 0.02874657984968656
+            },
+            {
+              "bucket": 1,
+              "trials": 26065,
+              "predicted": 0.1503767952390274,
+              "observed": 0.14989449453289852
+            },
+            {
+              "bucket": 2,
+              "trials": 29150,
+              "predicted": 0.2510444171623066,
+              "observed": 0.24795883361921098
+            },
+            {
+              "bucket": 3,
+              "trials": 31251,
+              "predicted": 0.3498387741854091,
+              "observed": 0.3497488080381428
+            },
+            {
+              "bucket": 4,
+              "trials": 29292,
+              "predicted": 0.44805234932073235,
+              "observed": 0.4531954117165096
+            },
+            {
+              "bucket": 5,
+              "trials": 25838,
+              "predicted": 0.5481344028944103,
+              "observed": 0.5414892793559873
+            },
+            {
+              "bucket": 6,
+              "trials": 22269,
+              "predicted": 0.6494188282422957,
+              "observed": 0.6428667654587095
+            },
+            {
+              "bucket": 7,
+              "trials": 20748,
+              "predicted": 0.7523040447827896,
+              "observed": 0.7433969539232698
+            },
+            {
+              "bucket": 8,
+              "trials": 21308,
+              "predicted": 0.8585510474268867,
+              "observed": 0.851886615355735
+            },
+            {
+              "bucket": 9,
+              "trials": 8989,
+              "predicted": 0.9243270328617563,
+              "observed": 0.9519412615418845
+            }
+          ]
+        },
+        "test_optimizer_converged": true,
+        "diagnostics": {
+          "price_bands": [
+            {
+              "group": 0,
+              "events": 134,
+              "residual": 0.28478043007473935,
+              "brier": 0.16173262743057007,
+              "log_loss": 0.49038141168574684,
+              "trial_weight": 8347,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 18,
+                  "predicted": 0.06911204760177145,
+                  "observed": 0.6111111111111112
+                },
+                {
+                  "bucket": 1,
+                  "trials": 73,
+                  "predicted": 0.1627384029991721,
+                  "observed": 0.8356164383561644
+                },
+                {
+                  "bucket": 2,
+                  "trials": 311,
+                  "predicted": 0.25854084396652127,
+                  "observed": 0.8713826366559485
+                },
+                {
+                  "bucket": 3,
+                  "trials": 695,
+                  "predicted": 0.35304952678647555,
+                  "observed": 0.8920863309352518
+                },
+                {
+                  "bucket": 4,
+                  "trials": 926,
+                  "predicted": 0.4517249998539309,
+                  "observed": 0.9071274298056156
+                },
+                {
+                  "bucket": 5,
+                  "trials": 1107,
+                  "predicted": 0.5516251024328338,
+                  "observed": 0.9322493224932249
+                },
+                {
+                  "bucket": 6,
+                  "trials": 1183,
+                  "predicted": 0.650783336100593,
+                  "observed": 0.9408284023668639
+                },
+                {
+                  "bucket": 7,
+                  "trials": 1435,
+                  "predicted": 0.7498295981086314,
+                  "observed": 0.9547038327526133
+                },
+                {
+                  "bucket": 8,
+                  "trials": 1802,
+                  "predicted": 0.855005781560737,
+                  "observed": 0.9755826859045506
+                },
+                {
+                  "bucket": 9,
+                  "trials": 797,
+                  "predicted": 0.9190580800212901,
+                  "observed": 0.9887076537013801
+                }
+              ]
+            },
+            {
+              "group": 1,
+              "events": 124,
+              "residual": 0.19722661054243784,
+              "brier": 0.19354018440035994,
+              "log_loss": 0.5666675098764964,
+              "trial_weight": 25525,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 104,
+                  "predicted": 0.06855669063593701,
+                  "observed": 0.8269230769230769
+                },
+                {
+                  "bucket": 1,
+                  "trials": 572,
+                  "predicted": 0.16123913930934994,
+                  "observed": 0.7062937062937062
+                },
+                {
+                  "bucket": 2,
+                  "trials": 1495,
+                  "predicted": 0.2560710615286353,
+                  "observed": 0.6996655518394649
+                },
+                {
+                  "bucket": 3,
+                  "trials": 2333,
+                  "predicted": 0.35337753820717194,
+                  "observed": 0.715387912558937
+                },
+                {
+                  "bucket": 4,
+                  "trials": 3050,
+                  "predicted": 0.4514255367919626,
+                  "observed": 0.7485245901639345
+                },
+                {
+                  "bucket": 5,
+                  "trials": 3355,
+                  "predicted": 0.5507365241641996,
+                  "observed": 0.7839046199701938
+                },
+                {
+                  "bucket": 6,
+                  "trials": 3601,
+                  "predicted": 0.6501424607833272,
+                  "observed": 0.8192168841988337
+                },
+                {
+                  "bucket": 7,
+                  "trials": 4003,
+                  "predicted": 0.7535338011851956,
+                  "observed": 0.8703472395703222
+                },
+                {
+                  "bucket": 8,
+                  "trials": 4614,
+                  "predicted": 0.8589359810792953,
+                  "observed": 0.9128738621586476
+                },
+                {
+                  "bucket": 9,
+                  "trials": 2398,
+                  "predicted": 0.9240690987736463,
+                  "observed": 0.9749791492910759
+                }
+              ]
+            },
+            {
+              "group": 2,
+              "events": 84,
+              "residual": 0.11039602303043473,
+              "brier": 0.2184633727923798,
+              "log_loss": 0.6267541683077626,
+              "trial_weight": 37825,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 336,
+                  "predicted": 0.0661731096824733,
+                  "observed": 0.5386904761904762
+                },
+                {
+                  "bucket": 1,
+                  "trials": 1367,
+                  "predicted": 0.15782026598215837,
+                  "observed": 0.5259692757863935
+                },
+                {
+                  "bucket": 2,
+                  "trials": 2855,
+                  "predicted": 0.2544958623092872,
+                  "observed": 0.5295971978984239
+                },
+                {
+                  "bucket": 3,
+                  "trials": 4275,
+                  "predicted": 0.35245283209194384,
+                  "observed": 0.5740350877192982
+                },
+                {
+                  "bucket": 4,
+                  "trials": 5175,
+                  "predicted": 0.4498442057435588,
+                  "observed": 0.6092753623188406
+                },
+                {
+                  "bucket": 5,
+                  "trials": 5331,
+                  "predicted": 0.5490997014175333,
+                  "observed": 0.6409679234665167
+                },
+                {
+                  "bucket": 6,
+                  "trials": 5259,
+                  "predicted": 0.65034595960525,
+                  "observed": 0.6930975470621791
+                },
+                {
+                  "bucket": 7,
+                  "trials": 5106,
+                  "predicted": 0.7535509364330689,
+                  "observed": 0.7753623188405797
+                },
+                {
+                  "bucket": 8,
+                  "trials": 5798,
+                  "predicted": 0.8612177546866141,
+                  "observed": 0.8734046222835461
+                },
+                {
+                  "bucket": 9,
+                  "trials": 2323,
+                  "predicted": 0.927524373092025,
+                  "observed": 0.9530779164873009
+                }
+              ]
+            },
+            {
+              "group": 3,
+              "events": 122,
+              "residual": 0.011567334970612957,
+              "brier": 0.22805666619478865,
+              "log_loss": 0.6520108268133952,
+              "trial_weight": 61168,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 1369,
+                  "predicted": 0.06469699510726806,
+                  "observed": 0.28487947406866326
+                },
+                {
+                  "bucket": 1,
+                  "trials": 3896,
+                  "predicted": 0.15579140898326488,
+                  "observed": 0.3239219712525667
+                },
+                {
+                  "bucket": 2,
+                  "trials": 6806,
+                  "predicted": 0.25398332422692804,
+                  "observed": 0.3474875110196885
+                },
+                {
+                  "bucket": 3,
+                  "trials": 9180,
+                  "predicted": 0.35122267346168706,
+                  "observed": 0.4
+                },
+                {
+                  "bucket": 4,
+                  "trials": 9481,
+                  "predicted": 0.44824176030354074,
+                  "observed": 0.4640860668705833
+                },
+                {
+                  "bucket": 5,
+                  "trials": 8567,
+                  "predicted": 0.5479726849985848,
+                  "observed": 0.5202521302673048
+                },
+                {
+                  "bucket": 6,
+                  "trials": 7174,
+                  "predicted": 0.6496716848431915,
+                  "observed": 0.5971563981042654
+                },
+                {
+                  "bucket": 7,
+                  "trials": 6318,
+                  "predicted": 0.7532679733888877,
+                  "observed": 0.6785375118708452
+                },
+                {
+                  "bucket": 8,
+                  "trials": 5910,
+                  "predicted": 0.8589364608507282,
+                  "observed": 0.7910321489001692
+                },
+                {
+                  "bucket": 9,
+                  "trials": 2467,
+                  "predicted": 0.924853167152631,
+                  "observed": 0.9266315362788813
+                }
+              ]
+            },
+            {
+              "group": 4,
+              "events": 140,
+              "residual": -0.09139942468672739,
+              "brier": 0.10440077377748326,
+              "log_loss": 0.33345824855265643,
+              "trial_weight": 139791,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 55919,
+                  "predicted": 0.02990432069985427,
+                  "observed": 0.01773994527799138
+                },
+                {
+                  "bucket": 1,
+                  "trials": 20157,
+                  "predicted": 0.1484724335865928,
+                  "observed": 0.0724810239618991
+                },
+                {
+                  "bucket": 2,
+                  "trials": 17683,
+                  "predicted": 0.24879919296730477,
+                  "observed": 0.11502573092800995
+                },
+                {
+                  "bucket": 3,
+                  "trials": 14768,
+                  "predicted": 0.34751166811639633,
+                  "observed": 0.1703006500541712
+                },
+                {
+                  "bucket": 4,
+                  "trials": 10660,
+                  "predicted": 0.4457298578857297,
+                  "observed": 0.24380863039399625
+                },
+                {
+                  "bucket": 5,
+                  "trials": 7478,
+                  "predicted": 0.5459473354348746,
+                  "observed": 0.32829633591869484
+                },
+                {
+                  "bucket": 6,
+                  "trials": 5052,
+                  "predicted": 0.6472593289015947,
+                  "observed": 0.4600158353127474
+                },
+                {
+                  "bucket": 7,
+                  "trials": 3886,
+                  "predicted": 0.7487454720599205,
+                  "observed": 0.5980442614513639
+                },
+                {
+                  "bucket": 8,
+                  "trials": 3184,
+                  "predicted": 0.8544282846102372,
+                  "observed": 0.7672738693467337
+                },
+                {
+                  "bucket": 9,
+                  "trials": 1004,
+                  "predicted": 0.920435087350439,
+                  "observed": 0.9272908366533864
+                }
+              ]
+            }
+          ],
+          "market_types": [
+            {
+              "group": "KXNBAGAME",
+              "events": 140,
+              "residual": -0.0017687678827683424,
+              "brier": 0.15806558905281715,
+              "log_loss": 0.47224722187344403,
+              "trial_weight": 272656,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 57746,
+                  "predicted": 0.03102202703309807,
+                  "observed": 0.02874657984968656
+                },
+                {
+                  "bucket": 1,
+                  "trials": 26065,
+                  "predicted": 0.1503767952390274,
+                  "observed": 0.14989449453289852
+                },
+                {
+                  "bucket": 2,
+                  "trials": 29150,
+                  "predicted": 0.2510444171623066,
+                  "observed": 0.24795883361921098
+                },
+                {
+                  "bucket": 3,
+                  "trials": 31251,
+                  "predicted": 0.3498387741854091,
+                  "observed": 0.3497488080381428
+                },
+                {
+                  "bucket": 4,
+                  "trials": 29292,
+                  "predicted": 0.44805234932073235,
+                  "observed": 0.4531954117165096
+                },
+                {
+                  "bucket": 5,
+                  "trials": 25838,
+                  "predicted": 0.5481344028944103,
+                  "observed": 0.5414892793559873
+                },
+                {
+                  "bucket": 6,
+                  "trials": 22269,
+                  "predicted": 0.6494188282422957,
+                  "observed": 0.6428667654587095
+                },
+                {
+                  "bucket": 7,
+                  "trials": 20748,
+                  "predicted": 0.7523040447827896,
+                  "observed": 0.7433969539232698
+                },
+                {
+                  "bucket": 8,
+                  "trials": 21308,
+                  "predicted": 0.8585510474268867,
+                  "observed": 0.851886615355735
+                },
+                {
+                  "bucket": 9,
+                  "trials": 8989,
+                  "predicted": 0.9243270328617563,
+                  "observed": 0.9519412615418845
+                }
+              ]
+            }
+          ],
+          "within_distance_time_price_effect": {
+            "status": "estimated",
+            "overlapping_bins": 1143,
+            "events": 140,
+            "residual_per_unit_price": -0.7380653954856208,
+            "cluster_standard_error": 0.0520388974480101,
+            "interval_95": [
+              -0.8400616344837206,
+              -0.6360691564875209
+            ]
+          }
+        },
+        "note": "Event groups are disjoint. Repeated states/bids remain dependent; final displayed fit uses all eligible games.",
+        "strengths": [
+          1e-06,
+          1e-06
+        ],
+        "optimizer_converged": true,
+        "basis_functions": [
+          12,
+          9
+        ],
+        "training_distance_range": [
+          0.04000533461369919,
+          9.190239700269178
+        ],
+        "weighting": "Summed actual hits / state-bid trials; correlated bids are not independent games."
+      },
+      "supported_grid_cells": 2380,
+      "grid_resolution": 51,
+      "runtime_seconds": 6.71
+    },
+    {
+      "family": "KXATPCHALLENGERMATCH",
+      "version": "odds-moneyness-1",
+      "bounds": [
+        0.0,
+        9.190239700269178
+      ],
+      "audit": {
+        "source_states": 167231,
+        "eligible_states": 167231,
+        "excluded_states": 0,
+        "endpoint_prices": 0,
+        "invalid_prices": 0,
+        "ended_horizon": 0,
+        "bid_trials": 8299349,
+        "side": "YES; upstream NO-taker prices complemented once",
+        "negative_distance": "Excluded: production bids must be strictly below current price.",
+        "source_distance_range": [
+          0.04000533461369919,
+          9.190239700269178
+        ]
+      },
+      "validation": {
+        "status": "whole-game tuning + independent test",
+        "reason": "Need at least 30 games, 10 training, 5 tuning and 5 independent test games.",
+        "model_version": "odds-moneyness-1",
+        "features": [
+          "log_odds_distance",
+          "normalized_time"
+        ],
+        "monotonic_distance": true,
+        "monotonicity_reason": "A farther below-market bid requires a lower future minimum under the same price-reaching horizon; pooled-price departures are checked in residual diagnostics.",
+        "empirical_distance_slope": -0.14258000047017863,
+        "train_events": 2506,
+        "tuning_events": 857,
+        "test_events": 861,
+        "candidates": [
+          {
+            "strengths": [
+              1e-06,
+              1e-06
+            ],
+            "converged": true,
+            "brier": 0.17427024290201845,
+            "log_loss": 0.516257486959219,
+            "trial_weight": 1679609,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 229897,
+                "predicted": 0.03729016632260986,
+                "observed": 0.030509315041083614
+              },
+              {
+                "bucket": 1,
+                "trials": 156557,
+                "predicted": 0.15111616717787774,
+                "observed": 0.1344941459021315
+              },
+              {
+                "bucket": 2,
+                "trials": 201088,
+                "predicted": 0.2517924463715235,
+                "observed": 0.23530991406747295
+              },
+              {
+                "bucket": 3,
+                "trials": 219790,
+                "predicted": 0.3499392510896773,
+                "observed": 0.33441921834478366
+              },
+              {
+                "bucket": 4,
+                "trials": 208492,
+                "predicted": 0.4486191604332441,
+                "observed": 0.4288605797824377
+              },
+              {
+                "bucket": 5,
+                "trials": 181379,
+                "predicted": 0.5483669366772649,
+                "observed": 0.5271393049912062
+              },
+              {
+                "bucket": 6,
+                "trials": 159173,
+                "predicted": 0.6481068236396713,
+                "observed": 0.6263939235925691
+              },
+              {
+                "bucket": 7,
+                "trials": 145513,
+                "predicted": 0.7494983494847776,
+                "observed": 0.732518744029743
+              },
+              {
+                "bucket": 8,
+                "trials": 150246,
+                "predicted": 0.8522457550171025,
+                "observed": 0.8453735873168005
+              },
+              {
+                "bucket": 9,
+                "trials": 27474,
+                "predicted": 0.9098622965694039,
+                "observed": 0.9264031447914391
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.0001,
+              0.0001
+            ],
+            "converged": true,
+            "brier": 0.17532484995926023,
+            "log_loss": 0.5196364633147391,
+            "trial_weight": 1679609,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 253335,
+                "predicted": 0.04150338363960697,
+                "observed": 0.04032210314405826
+              },
+              {
+                "bucket": 1,
+                "trials": 166333,
+                "predicted": 0.14932853152006825,
+                "observed": 0.15108847913522871
+              },
+              {
+                "bucket": 2,
+                "trials": 165726,
+                "predicted": 0.25036102091093254,
+                "observed": 0.2400226880513619
+              },
+              {
+                "bucket": 3,
+                "trials": 176993,
+                "predicted": 0.3503556870493362,
+                "observed": 0.32265682823614494
+              },
+              {
+                "bucket": 4,
+                "trials": 193870,
+                "predicted": 0.4506637101771067,
+                "observed": 0.4050652499097333
+              },
+              {
+                "bucket": 5,
+                "trials": 203913,
+                "predicted": 0.5501319845371483,
+                "observed": 0.5024348619264097
+              },
+              {
+                "bucket": 6,
+                "trials": 203178,
+                "predicted": 0.6492935977000023,
+                "observed": 0.6165874258039749
+              },
+              {
+                "bucket": 7,
+                "trials": 186921,
+                "predicted": 0.748146373065363,
+                "observed": 0.7530400543545134
+              },
+              {
+                "bucket": 8,
+                "trials": 129340,
+                "predicted": 0.8333471184048248,
+                "observed": 0.8769676820782434
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.01,
+              0.01
+            ],
+            "converged": false,
+            "brier": 0.1764320541098842,
+            "log_loss": 0.5233923015450834,
+            "trial_weight": 1679609,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 247516,
+                "predicted": 0.045839947076392995,
+                "observed": 0.04512839574007337
+              },
+              {
+                "bucket": 1,
+                "trials": 177128,
+                "predicted": 0.14832621494352963,
+                "observed": 0.15290637279255678
+              },
+              {
+                "bucket": 2,
+                "trials": 175075,
+                "predicted": 0.24931344724929666,
+                "observed": 0.23871483649864345
+              },
+              {
+                "bucket": 3,
+                "trials": 177286,
+                "predicted": 0.350476450643896,
+                "observed": 0.3246392834177544
+              },
+              {
+                "bucket": 4,
+                "trials": 185990,
+                "predicted": 0.45043031264155126,
+                "observed": 0.41399537609548903
+              },
+              {
+                "bucket": 5,
+                "trials": 192109,
+                "predicted": 0.5495201490081976,
+                "observed": 0.5077534108240634
+              },
+              {
+                "bucket": 6,
+                "trials": 200664,
+                "predicted": 0.6494982169345676,
+                "observed": 0.6159301120280668
+              },
+              {
+                "bucket": 7,
+                "trials": 193002,
+                "predicted": 0.750123426421672,
+                "observed": 0.7456917544895908
+              },
+              {
+                "bucket": 8,
+                "trials": 129212,
+                "predicted": 0.8405967933685544,
+                "observed": 0.8626830325356778
+              },
+              {
+                "bucket": 9,
+                "trials": 1627,
+                "predicted": 0.9057870579408334,
+                "observed": 0.9526736324523664
+              }
+            ]
+          },
+          {
+            "strengths": [
+              0.0001,
+              1e-06
+            ],
+            "converged": true,
+            "brier": 0.1751099675484599,
+            "log_loss": 0.5184242330851043,
+            "trial_weight": 1679609,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 255909,
+                "predicted": 0.03772560139835855,
+                "observed": 0.037790777190329375
+              },
+              {
+                "bucket": 1,
+                "trials": 160535,
+                "predicted": 0.1499433319124406,
+                "observed": 0.1533123617902638
+              },
+              {
+                "bucket": 2,
+                "trials": 166469,
+                "predicted": 0.25094993304896307,
+                "observed": 0.2402549423616409
+              },
+              {
+                "bucket": 3,
+                "trials": 178610,
+                "predicted": 0.35117857480476594,
+                "observed": 0.322557527574044
+              },
+              {
+                "bucket": 4,
+                "trials": 194930,
+                "predicted": 0.4510180807102218,
+                "observed": 0.4046119119683989
+              },
+              {
+                "bucket": 5,
+                "trials": 203590,
+                "predicted": 0.5500561762237355,
+                "observed": 0.5018124662311508
+              },
+              {
+                "bucket": 6,
+                "trials": 202875,
+                "predicted": 0.6490633199299396,
+                "observed": 0.6172963647566235
+              },
+              {
+                "bucket": 7,
+                "trials": 189091,
+                "predicted": 0.7490978812483029,
+                "observed": 0.7532246378727703
+              },
+              {
+                "bucket": 8,
+                "trials": 127600,
+                "predicted": 0.8344250207714691,
+                "observed": 0.8784561128526646
+              }
+            ]
+          },
+          {
+            "strengths": [
+              1e-06,
+              0.0001
+            ],
+            "converged": false,
+            "brier": 0.17440760416484383,
+            "log_loss": 0.5171244924139835,
+            "trial_weight": 1679609,
+            "calibration": [
+              {
+                "bucket": 0,
+                "trials": 232727,
+                "predicted": 0.044218411548331095,
+                "observed": 0.03217503770512231
+              },
+              {
+                "bucket": 1,
+                "trials": 167341,
+                "predicted": 0.150057136595205,
+                "observed": 0.139451778105784
+              },
+              {
+                "bucket": 2,
+                "trials": 184564,
+                "predicted": 0.2513603598533716,
+                "observed": 0.23944539563511844
+              },
+              {
+                "bucket": 3,
+                "trials": 220607,
+                "predicted": 0.35052425476598814,
+                "observed": 0.3322378709651099
+              },
+              {
+                "bucket": 4,
+                "trials": 211844,
+                "predicted": 0.4489447895699251,
+                "observed": 0.42868337078227375
+              },
+              {
+                "bucket": 5,
+                "trials": 182303,
+                "predicted": 0.5489427687349074,
+                "observed": 0.5265629199738896
+              },
+              {
+                "bucket": 6,
+                "trials": 159099,
+                "predicted": 0.648990468838459,
+                "observed": 0.6280052043067524
+              },
+              {
+                "bucket": 7,
+                "trials": 143203,
+                "predicted": 0.7496801942565692,
+                "observed": 0.7337974763098538
+              },
+              {
+                "bucket": 8,
+                "trials": 149318,
+                "predicted": 0.8509441034043994,
+                "observed": 0.8448679998392692
+              },
+              {
+                "bucket": 9,
+                "trials": 28603,
+                "predicted": 0.9106236113416137,
+                "observed": 0.9232597979232947
+              }
+            ]
+          }
+        ],
+        "selected_tuning": {
+          "strengths": [
+            1e-06,
+            1e-06
+          ],
+          "converged": true,
+          "brier": 0.17427024290201845,
+          "log_loss": 0.516257486959219,
+          "trial_weight": 1679609,
+          "calibration": [
+            {
+              "bucket": 0,
+              "trials": 229897,
+              "predicted": 0.03729016632260986,
+              "observed": 0.030509315041083614
+            },
+            {
+              "bucket": 1,
+              "trials": 156557,
+              "predicted": 0.15111616717787774,
+              "observed": 0.1344941459021315
+            },
+            {
+              "bucket": 2,
+              "trials": 201088,
+              "predicted": 0.2517924463715235,
+              "observed": 0.23530991406747295
+            },
+            {
+              "bucket": 3,
+              "trials": 219790,
+              "predicted": 0.3499392510896773,
+              "observed": 0.33441921834478366
+            },
+            {
+              "bucket": 4,
+              "trials": 208492,
+              "predicted": 0.4486191604332441,
+              "observed": 0.4288605797824377
+            },
+            {
+              "bucket": 5,
+              "trials": 181379,
+              "predicted": 0.5483669366772649,
+              "observed": 0.5271393049912062
+            },
+            {
+              "bucket": 6,
+              "trials": 159173,
+              "predicted": 0.6481068236396713,
+              "observed": 0.6263939235925691
+            },
+            {
+              "bucket": 7,
+              "trials": 145513,
+              "predicted": 0.7494983494847776,
+              "observed": 0.732518744029743
+            },
+            {
+              "bucket": 8,
+              "trials": 150246,
+              "predicted": 0.8522457550171025,
+              "observed": 0.8453735873168005
+            },
+            {
+              "bucket": 9,
+              "trials": 27474,
+              "predicted": 0.9098622965694039,
+              "observed": 0.9264031447914391
+            }
+          ]
+        },
+        "test_metrics": {
+          "brier": 0.1761734564702169,
+          "log_loss": 0.5211474854571956,
+          "trial_weight": 1692903,
+          "calibration": [
+            {
+              "bucket": 0,
+              "trials": 235545,
+              "predicted": 0.03721831716746477,
+              "observed": 0.036252096202424165
+            },
+            {
+              "bucket": 1,
+              "trials": 158661,
+              "predicted": 0.15215394595519627,
+              "observed": 0.15326387707123995
+            },
+            {
+              "bucket": 2,
+              "trials": 201005,
+              "predicted": 0.25204605705988,
+              "observed": 0.25683938210492274
+            },
+            {
+              "bucket": 3,
+              "trials": 224938,
+              "predicted": 0.349977790044054,
+              "observed": 0.3560269941050423
+            },
+            {
+              "bucket": 4,
+              "trials": 210766,
+              "predicted": 0.44896220386513414,
+              "observed": 0.45459893910782573
+            },
+            {
+              "bucket": 5,
+              "trials": 183112,
+              "predicted": 0.5489936565863442,
+              "observed": 0.5517552099261654
+            },
+            {
+              "bucket": 6,
+              "trials": 158977,
+              "predicted": 0.6489425544624167,
+              "observed": 0.6480119765752279
+            },
+            {
+              "bucket": 7,
+              "trials": 143470,
+              "predicted": 0.7495931671697332,
+              "observed": 0.7436049348295811
+            },
+            {
+              "bucket": 8,
+              "trials": 151884,
+              "predicted": 0.8520525146350705,
+              "observed": 0.8602025229780622
+            },
+            {
+              "bucket": 9,
+              "trials": 24545,
+              "predicted": 0.9091242406638814,
+              "observed": 0.9365247504583418
+            }
+          ]
+        },
+        "test_optimizer_converged": true,
+        "diagnostics": {
+          "price_bands": [
+            {
+              "group": 0,
+              "events": 807,
+              "residual": 0.31573898287522495,
+              "brier": 0.2002185346240576,
+              "log_loss": 0.5857373803534768,
+              "trial_weight": 56469,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 269,
+                  "predicted": 0.07357103582709833,
+                  "observed": 0.9144981412639405
+                },
+                {
+                  "bucket": 1,
+                  "trials": 1377,
+                  "predicted": 0.1583972058778968,
+                  "observed": 0.9222948438634713
+                },
+                {
+                  "bucket": 2,
+                  "trials": 3034,
+                  "predicted": 0.2567917562218433,
+                  "observed": 0.9103493737640079
+                },
+                {
+                  "bucket": 3,
+                  "trials": 5472,
+                  "predicted": 0.35290482940016454,
+                  "observed": 0.8919956140350878
+                },
+                {
+                  "bucket": 4,
+                  "trials": 7005,
+                  "predicted": 0.4508507782535463,
+                  "observed": 0.8987865810135618
+                },
+                {
+                  "bucket": 5,
+                  "trials": 7942,
+                  "predicted": 0.5504046036830204,
+                  "observed": 0.9102241249055654
+                },
+                {
+                  "bucket": 6,
+                  "trials": 8796,
+                  "predicted": 0.6504949189606677,
+                  "observed": 0.9247385175079582
+                },
+                {
+                  "bucket": 7,
+                  "trials": 9720,
+                  "predicted": 0.7515440916271534,
+                  "observed": 0.9433127572016461
+                },
+                {
+                  "bucket": 8,
+                  "trials": 12065,
+                  "predicted": 0.8534032190958306,
+                  "observed": 0.9619560712805636
+                },
+                {
+                  "bucket": 9,
+                  "trials": 789,
+                  "predicted": 0.9047346257680572,
+                  "observed": 0.9518377693282636
+                }
+              ]
+            },
+            {
+              "group": 1,
+              "events": 766,
+              "residual": 0.23050959487043704,
+              "brier": 0.21064671483874725,
+              "log_loss": 0.6106797531336177,
+              "trial_weight": 176707,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 1429,
+                  "predicted": 0.06690720326145404,
+                  "observed": 0.8019594121763471
+                },
+                {
+                  "bucket": 1,
+                  "trials": 4694,
+                  "predicted": 0.1567634951432916,
+                  "observed": 0.7856838517256072
+                },
+                {
+                  "bucket": 2,
+                  "trials": 11092,
+                  "predicted": 0.25738456434501866,
+                  "observed": 0.7490082942661378
+                },
+                {
+                  "bucket": 3,
+                  "trials": 18019,
+                  "predicted": 0.3526924279311724,
+                  "observed": 0.7474332648870636
+                },
+                {
+                  "bucket": 4,
+                  "trials": 22832,
+                  "predicted": 0.45132066029569373,
+                  "observed": 0.7653731604765242
+                },
+                {
+                  "bucket": 5,
+                  "trials": 24938,
+                  "predicted": 0.5508998492624207,
+                  "observed": 0.792365065362098
+                },
+                {
+                  "bucket": 6,
+                  "trials": 26354,
+                  "predicted": 0.6504084678521207,
+                  "observed": 0.8270850724747666
+                },
+                {
+                  "bucket": 7,
+                  "trials": 27485,
+                  "predicted": 0.7510045615987075,
+                  "observed": 0.87302164817173
+                },
+                {
+                  "bucket": 8,
+                  "trials": 33382,
+                  "predicted": 0.8532317593823179,
+                  "observed": 0.9320891498412318
+                },
+                {
+                  "bucket": 9,
+                  "trials": 6482,
+                  "predicted": 0.908378100457634,
+                  "observed": 0.9592718296821968
+                }
+              ]
+            },
+            {
+              "group": 2,
+              "events": 588,
+              "residual": 0.10756294966785648,
+              "brier": 0.227214902437486,
+              "log_loss": 0.6502721131346304,
+              "trial_weight": 299207,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 4109,
+                  "predicted": 0.06310122481890403,
+                  "observed": 0.4889267461669506
+                },
+                {
+                  "bucket": 1,
+                  "trials": 10798,
+                  "predicted": 0.15705942279842738,
+                  "observed": 0.5115762178181145
+                },
+                {
+                  "bucket": 2,
+                  "trials": 23678,
+                  "predicted": 0.25446471539449184,
+                  "observed": 0.5187515837486274
+                },
+                {
+                  "bucket": 3,
+                  "trials": 36688,
+                  "predicted": 0.35219594882792055,
+                  "observed": 0.5445104666375927
+                },
+                {
+                  "bucket": 4,
+                  "trials": 43324,
+                  "predicted": 0.45042359174527374,
+                  "observed": 0.5898808974240606
+                },
+                {
+                  "bucket": 5,
+                  "trials": 44262,
+                  "predicted": 0.5497870068038765,
+                  "observed": 0.6423794677149699
+                },
+                {
+                  "bucket": 6,
+                  "trials": 42163,
+                  "predicted": 0.649355017722083,
+                  "observed": 0.700661717619714
+                },
+                {
+                  "bucket": 7,
+                  "trials": 40388,
+                  "predicted": 0.7494322328081857,
+                  "observed": 0.763444587501238
+                },
+                {
+                  "bucket": 8,
+                  "trials": 44997,
+                  "predicted": 0.8521431442683325,
+                  "observed": 0.856768228993044
+                },
+                {
+                  "bucket": 9,
+                  "trials": 8800,
+                  "predicted": 0.9106917681160307,
+                  "observed": 0.9351136363636363
+                }
+              ]
+            },
+            {
+              "group": 3,
+              "events": 756,
+              "residual": -0.03167570230194002,
+              "brier": 0.22064882234915303,
+              "log_loss": 0.634020797618682,
+              "trial_weight": 434549,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 12309,
+                  "predicted": 0.05925110256660042,
+                  "observed": 0.18498659517426275
+                },
+                {
+                  "bucket": 1,
+                  "trials": 27836,
+                  "predicted": 0.1564395102499474,
+                  "observed": 0.24547348757005316
+                },
+                {
+                  "bucket": 2,
+                  "trials": 49910,
+                  "predicted": 0.2541008615594165,
+                  "observed": 0.2916850330595071
+                },
+                {
+                  "bucket": 3,
+                  "trials": 69187,
+                  "predicted": 0.35137195439827124,
+                  "observed": 0.33883533033662394
+                },
+                {
+                  "bucket": 4,
+                  "trials": 70172,
+                  "predicted": 0.44960431021529373,
+                  "observed": 0.3989767998631933
+                },
+                {
+                  "bucket": 5,
+                  "trials": 61326,
+                  "predicted": 0.5490255340080786,
+                  "observed": 0.46463164073965363
+                },
+                {
+                  "bucket": 6,
+                  "trials": 50869,
+                  "predicted": 0.6485782594169568,
+                  "observed": 0.5564489178084885
+                },
+                {
+                  "bucket": 7,
+                  "trials": 43328,
+                  "predicted": 0.7489299281729912,
+                  "observed": 0.6624122968980798
+                },
+                {
+                  "bucket": 8,
+                  "trials": 42182,
+                  "predicted": 0.8513001747429433,
+                  "observed": 0.8099900431463658
+                },
+                {
+                  "bucket": 9,
+                  "trials": 7430,
+                  "predicted": 0.908916068538069,
+                  "observed": 0.9232839838492598
+                }
+              ]
+            },
+            {
+              "group": 4,
+              "events": 834,
+              "residual": -0.09933088098325314,
+              "brier": 0.11825357912573396,
+              "log_loss": 0.37354891389009504,
+              "trial_weight": 725971,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 217429,
+                  "predicted": 0.0352417697769811,
+                  "observed": 0.013158318347598527
+                },
+                {
+                  "bucket": 1,
+                  "trials": 113956,
+                  "predicted": 0.15037697502374572,
+                  "observed": 0.06144476815613044
+                },
+                {
+                  "bucket": 2,
+                  "trials": 113291,
+                  "predicted": 0.24998554511556878,
+                  "observed": 0.12105992532504789
+                },
+                {
+                  "bucket": 3,
+                  "trials": 95572,
+                  "predicted": 0.34743761428041675,
+                  "observed": 0.1916356254970075
+                },
+                {
+                  "bucket": 4,
+                  "trials": 67433,
+                  "predicted": 0.4463603798896928,
+                  "observed": 0.2741980929218632
+                },
+                {
+                  "bucket": 5,
+                  "trials": 44644,
+                  "predicted": 0.5468475102533209,
+                  "observed": 0.3834109846787922
+                },
+                {
+                  "bucket": 6,
+                  "trials": 30795,
+                  "predicted": 0.6472816795363344,
+                  "observed": 0.49488553336580615
+                },
+                {
+                  "bucket": 7,
+                  "trials": 22549,
+                  "predicted": 0.7485945186548788,
+                  "observed": 0.6202492349993348
+                },
+                {
+                  "bucket": 8,
+                  "trials": 19258,
+                  "predicted": 0.8505983315553186,
+                  "observed": 0.7898535673486343
+                },
+                {
+                  "bucket": 9,
+                  "trials": 1044,
+                  "predicted": 0.9053429804010216,
+                  "observed": 0.8898467432950191
+                }
+              ]
+            }
+          ],
+          "market_types": [
+            {
+              "group": "KXATPCHALLENGERMATCH",
+              "events": 861,
+              "residual": 0.002876554255100693,
+              "brier": 0.1761734564702169,
+              "log_loss": 0.5211474854571956,
+              "trial_weight": 1692903,
+              "calibration": [
+                {
+                  "bucket": 0,
+                  "trials": 235545,
+                  "predicted": 0.03721831716746477,
+                  "observed": 0.036252096202424165
+                },
+                {
+                  "bucket": 1,
+                  "trials": 158661,
+                  "predicted": 0.15215394595519627,
+                  "observed": 0.15326387707123995
+                },
+                {
+                  "bucket": 2,
+                  "trials": 201005,
+                  "predicted": 0.25204605705988,
+                  "observed": 0.25683938210492274
+                },
+                {
+                  "bucket": 3,
+                  "trials": 224938,
+                  "predicted": 0.349977790044054,
+                  "observed": 0.3560269941050423
+                },
+                {
+                  "bucket": 4,
+                  "trials": 210766,
+                  "predicted": 0.44896220386513414,
+                  "observed": 0.45459893910782573
+                },
+                {
+                  "bucket": 5,
+                  "trials": 183112,
+                  "predicted": 0.5489936565863442,
+                  "observed": 0.5517552099261654
+                },
+                {
+                  "bucket": 6,
+                  "trials": 158977,
+                  "predicted": 0.6489425544624167,
+                  "observed": 0.6480119765752279
+                },
+                {
+                  "bucket": 7,
+                  "trials": 143470,
+                  "predicted": 0.7495931671697332,
+                  "observed": 0.7436049348295811
+                },
+                {
+                  "bucket": 8,
+                  "trials": 151884,
+                  "predicted": 0.8520525146350705,
+                  "observed": 0.8602025229780622
+                },
+                {
+                  "bucket": 9,
+                  "trials": 24545,
+                  "predicted": 0.9091242406638814,
+                  "observed": 0.9365247504583418
+                }
+              ]
+            }
+          ],
+          "within_distance_time_price_effect": {
+            "status": "estimated",
+            "overlapping_bins": 1200,
+            "events": 861,
+            "residual_per_unit_price": -0.7387514301605929,
+            "cluster_standard_error": 0.021376910628125988,
+            "interval_95": [
+              -0.7806501749917198,
+              -0.6968526853294659
+            ]
+          }
+        },
+        "note": "Event groups are disjoint. Repeated states/bids remain dependent; final displayed fit uses all eligible games.",
+        "strengths": [
+          1e-06,
+          1e-06
+        ],
+        "optimizer_converged": true,
+        "basis_functions": [
+          12,
+          9
+        ],
+        "training_distance_range": [
+          0.04000533461369919,
+          9.190239700269178
+        ],
+        "weighting": "Summed actual hits / state-bid trials; correlated bids are not independent games."
+      },
+      "supported_grid_cells": 2440,
+      "grid_resolution": 51,
+      "runtime_seconds": 47.16
+    }
+  ]
+}

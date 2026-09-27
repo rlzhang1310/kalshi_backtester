@@ -17,6 +17,8 @@ from src.analysis.kalshi.fill_probability import (
 from src.analysis.kalshi.fill_probability_data import prepare_fill_data
 from src.analysis.kalshi.local_game_data import DEFAULT_DATA_DIR
 from src.analysis.kalshi.fill_surface_ui import scenario_controls, surface_explorer
+from src.analysis.kalshi.no_clv_fill_ui import no_clv_page
+from src.analysis.kalshi.odds_moneyness_ui import odds_moneyness_page
 
 
 ROOT = Path(__file__).resolve().parent
@@ -120,7 +122,8 @@ def preparation_panel(output_dir):
         st.rerun()
 
 
-def query_panel(family, folder, manifest):
+def game_panel(family, folder, manifest, show_clv=True, compact=False):
+    """Entry-point widgets shared by both routes, including downloads/exclusions."""
     path = folder / "snapshots.parquet"
     try:
         stat = path.stat()
@@ -128,12 +131,18 @@ def query_panel(family, folder, manifest):
     except Exception as exc:
         st.error(f"Could not load this family's observations: {exc}")
         return
-    a, b, c = st.columns(3)
-    a.metric(
-        "Eligible tickers", f"{manifest.get('audit_counts', {}).get('included', 0):,}"
-    )
-    b.metric("Sampled states", f"{len(snapshots):,}")
-    c.metric("Matches with observations", f"{snapshots.event_ticker.nunique():,}")
+    if compact:
+        st.caption(
+            f"{snapshots.event_ticker.nunique():,} matches · {len(snapshots):,} historical states"
+        )
+    else:
+        a, b, c = st.columns(3)
+        a.metric(
+            "Eligible tickers",
+            f"{manifest.get('audit_counts', {}).get('included', 0):,}",
+        )
+        b.metric("Sampled states", f"{len(snapshots):,}")
+        c.metric("Matches with observations", f"{snapshots.event_ticker.nunique():,}")
     st.caption(f"Archive coverage through {manifest.get('coverage_end', 'unknown')}")
     ticker_status = {}
     with st.expander("Browse processed tickers and exclusions"):
@@ -173,11 +182,22 @@ def query_panel(family, folder, manifest):
             st.info(
                 f"This ticker was excluded: {ticker_status.get(ticker, 'no eligible observations')}. You can still enter a scenario and estimate it using other matches."
             )
-        else:
+        elif show_clv:
             st.caption(
                 f"Stored pregame price: {stored.iloc[0]:.1%}. This ticker's match is excluded from estimates."
             )
+        else:
+            st.caption("This ticker's whole match is excluded from estimates.")
+    return str(path), snapshots, ticker
 
+
+def query_panel(family, folder, manifest):
+    context = game_panel(family, folder, manifest)
+    if context is not None:
+        clv_query_panel(family, *context)
+
+
+def clv_query_panel(family, path, snapshots, ticker):
     st.subheader("Your scenario")
     clv, x, t, y = scenario_controls("estimator")
     with st.expander("Similarity and support settings"):
@@ -195,16 +215,12 @@ def query_panel(family, folder, manifest):
             placeholder="2026-07-01T00:00:00Z",
         )
     if st.button("Visualize", key="visualize", type="primary"):
-        st.session_state["surface_open"] = True
-    if st.session_state.get("surface_open", False):
-        surface_explorer(
-            str(path),
-            family,
-            ticker,
-            as_of.strip() or None,
-            (clv_tol / 100, price_tol / 100, time_tol),
-            int(minimum),
+        st.session_state["clv_visualizer_settings"] = dict(
+            as_of=as_of.strip() or None,
+            tolerances=(clv_tol / 100, price_tol / 100, time_tol),
+            minimum=int(minimum),
         )
+        st.switch_page(st.session_state["clv_visualizer_page"])
     if y >= x:
         st.warning("Set your bid y below the current price x.")
         return
@@ -297,15 +313,98 @@ def main():
     st.write(
         "Explore how often similar historical situations reached your bid before trading closed."
     )
+    context = None
+
+    def estimates_route():
+        if context is not None:
+            clv_query_panel(family, *context)
+
+    def clv_route():
+        if context is not None:
+            path, _, ticker = context
+            settings = st.session_state.get(
+                "clv_visualizer_settings",
+                dict(as_of=None, tolerances=(0.05, 0.05, 0.025), minimum=20),
+            )
+            with st.sidebar.expander("Similarity and support settings"):
+                tolerances = (
+                    st.number_input(
+                        "CLV tolerance (percentage points)",
+                        0.0,
+                        100.0,
+                        settings["tolerances"][0] * 100,
+                        key="clv_page_clv_tol",
+                    )
+                    / 100,
+                    st.number_input(
+                        "Price tolerance (¢)",
+                        0.0,
+                        100.0,
+                        settings["tolerances"][1] * 100,
+                        key="clv_page_price_tol",
+                    )
+                    / 100,
+                    st.number_input(
+                        "Time tolerance",
+                        0.0,
+                        1.0,
+                        settings["tolerances"][2],
+                        0.005,
+                        format="%.3f",
+                        key="clv_page_time_tol",
+                    ),
+                )
+                minimum = int(
+                    st.number_input(
+                        "Minimum reference matches",
+                        min_value=1,
+                        value=settings["minimum"],
+                        key="clv_page_minimum",
+                    )
+                )
+                cutoff = (
+                    st.text_input(
+                        "Only use matches settled before (optional)",
+                        value=settings["as_of"] or "",
+                        key="clv_page_cutoff",
+                    ).strip()
+                    or None
+                )
+            st.session_state["clv_visualizer_settings"] = dict(
+                as_of=cutoff, tolerances=tolerances, minimum=minimum
+            )
+            surface_explorer(path, family, ticker, cutoff, tolerances, minimum)
+
+    def no_clv_route():
+        if context is not None:
+            path, _, ticker = context
+            no_clv_page(path, family, ticker)
+
+    def odds_route():
+        if context is not None:
+            path, _, ticker = context
+            odds_moneyness_page(path, family, ticker)
+
+    clv_page = st.Page(clv_route, title="CLV Visualizer", url_path="clv")
+    st.session_state["clv_visualizer_page"] = clv_page
+    page = st.navigation(
+        [
+            st.Page(estimates_route, title="Historical estimates", default=True),
+            clv_page,
+            st.Page(no_clv_route, title="No-CLV Visualizer", url_path="no-clv"),
+            st.Page(odds_route, title="Oddness Visualizer", url_path="odds-moneyness"),
+        ],
+        position="top",
+    )
+    is_no_clv = page.url_path in ("no-clv", "odds-moneyness")
     with st.sidebar:
-        st.header("Saved data")
-        output_dir = Path(
-            st.text_input("Results directory", str(ROOT / "output/fill_probability"))
-        )
-        st.button("Reload prepared families")
-        st.caption(
-            "Time runs from event start (0) to actual settlement (1). This is a retrospective research tool. Touch and trade-through rates do not model queue position or order size."
-        )
+        with st.expander("Saved data", expanded=page.url_path == ""):
+            output_dir = Path(
+                st.text_input(
+                    "Results directory", str(ROOT / "output/fill_probability")
+                )
+            )
+            st.button("Reload prepared families")
     with st.expander("Run a new family or refresh existing data"):
         preparation_panel(output_dir)
     if "prepared_message" in st.session_state:
@@ -324,7 +423,14 @@ def main():
     if st.session_state.get("family") not in families:
         st.session_state["family"] = next(iter(families))
     family = st.selectbox("Prepared ticker family", list(families), key="family")
-    query_panel(family, output_dir / family, families[family])
+    context = game_panel(
+        family,
+        output_dir / family,
+        families[family],
+        show_clv=not is_no_clv,
+        compact=page.url_path != "",
+    )
+    page.run()
 
 
 if __name__ == "__main__":

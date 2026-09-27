@@ -12,6 +12,8 @@ Paths and commands below are relative to the repository root.
 | Data preparation and timing | `src/analysis/kalshi/fill_probability_data.py` |
 | Four-dimensional surface model | `src/analysis/kalshi/fill_surface.py` |
 | Surface charts and shared slider state | `src/analysis/kalshi/fill_surface_ui.py` |
+| Three-input model and full-page no-CLV workspace | `src/analysis/kalshi/no_clv_fill.py`, `src/analysis/kalshi/no_clv_fill_ui.py` |
+| Two-input odds-moneyness model and page | `src/analysis/kalshi/odds_moneyness.py`, `src/analysis/kalshi/odds_moneyness_ui.py` |
 | Game CLI / notebook | `visualize_game.py`, `single_game_odds_time_series_visualizer.ipynb` |
 | Game rendering | `src/analysis/kalshi/single_game_odds_time_series.py` |
 | Local archive access | `src/analysis/kalshi/local_game_data.py` |
@@ -19,8 +21,11 @@ Paths and commands below are relative to the repository root.
 | Calibration CLI | `analyze.py` |
 
 Read [fill_probability.md](fill_probability.md) for estimator definitions and
-[fill_surface.md](fill_surface.md) for the visualization model. Local archives
+[fill_surface.md](fill_surface.md) for the CLV visualization model and
+[no_clv_fill.md](no_clv_fill.md) for the new `/no-clv` page. Local archives
 live under `data/`; generated datasets and charts live under `output/`.
+Read [odds_moneyness.md](odds_moneyness.md) for `/odds-moneyness`, its independent
+`[logit(p)-logit(b), t]` model, finite-price filtering and price-band diagnostics.
 
 ## Data and modeling conventions
 
@@ -48,7 +53,8 @@ live under `data/`; generated datasets and charts live under `output/`.
 Install `requirements-ui.txt` for dashboard work. Relevant checks:
 
 ```powershell
-python -m pytest tests/test_fill_probability.py tests/test_fill_surface.py tests/test_fill_app.py -q
+python -m pytest tests/test_fill_probability.py tests/test_fill_surface.py tests/test_no_clv_fill.py tests/test_odds_moneyness.py tests/test_fill_playback.py tests/test_fill_app.py -q
+node --test tests/fill_playback.test.mjs tests/odds_moneyness_playback.test.mjs
 python -m ruff check fill_app.py src/analysis/kalshi/fill_surface.py src/analysis/kalshi/fill_surface_ui.py
 ```
 
