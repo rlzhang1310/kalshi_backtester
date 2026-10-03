@@ -16,6 +16,7 @@ squarify==0.4.4
 tenacity==9.1.2
 tqdm==4.67.1
 web3==7.14.0
+websockets==15.0.1
 
 # Development tools
 pytest==9.0.2

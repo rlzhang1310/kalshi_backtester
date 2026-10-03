@@ -10,10 +10,14 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import json
+import time
 import webbrowser
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
-from typing import Sequence
+from threading import Lock
+from typing import Callable, Protocol, Sequence
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import duckdb
@@ -26,10 +30,15 @@ from src.analysis.kalshi.local_game_data import (
 from src.analysis.kalshi.game_overlays import load_game_overlays
 
 from src.analysis.kalshi.single_game_odds_time_series import (
+    GameOddsData,
     build_game_odds_figure,
     figure_display_config,
+    game_is_unsettled,
     load_game_odds,
+    refresh_api_game,
+    volume_rebucket_script,
 )
+from src.indexers.kalshi.client import KalshiClient
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -136,6 +145,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--no-show",
         action="store_true",
         help="Build/save the chart without opening a browser window",
+    )
+    parser.add_argument(
+        "--refresh-seconds",
+        type=int,
+        default=10,
+        help="Check unsettled API games for new trades every N seconds (default: 10)",
     )
     return parser.parse_args(argv)
 
@@ -266,6 +281,93 @@ def choose_local_game(
             print("Enter a game number or type a team/name to search.")
 
 
+class ChartSession(Protocol):
+    def snapshot(self, since: int) -> dict: ...
+    def close(self) -> None: ...
+
+
+class LiveGameSession:
+    """Poll Kalshi at most once per interval and serve changed chart snapshots."""
+
+    def __init__(
+        self,
+        game: GameOddsData,
+        build_figure: Callable[[GameOddsData], object],
+        refresh_seconds: int,
+        client: KalshiClient | None = None,
+    ) -> None:
+        self.game = game
+        self.build_figure = build_figure
+        self.refresh_seconds = refresh_seconds
+        self.client = client or KalshiClient()
+        self.last_poll = time.monotonic()
+        self.revision = 0
+        self.figure = None
+        self.lock = Lock()
+
+    def snapshot(self, since: int) -> dict:
+        with self.lock:
+            due = time.monotonic() - self.last_poll >= self.refresh_seconds
+            if game_is_unsettled(self.game) and due:
+                self.last_poll = time.monotonic()
+                if refresh_api_game(self.game, self.client):
+                    self.figure = self.build_figure(self.game)
+                    self.revision += 1
+            result = {"revision": self.revision, "live": game_is_unsettled(self.game)}
+            if self.revision > since and self.figure is not None:
+                result["figure"] = json.loads(self.figure.to_json())
+            return result
+
+    def close(self) -> None:
+        self.client.close()
+
+
+def open_live_chart_in_browser(html: bytes, session: ChartSession) -> str:
+    """Keep a loopback chart endpoint available until Ctrl+C."""
+
+    class LiveHTTPServer(ThreadingHTTPServer):
+        daemon_threads = True
+
+    class LiveChartHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            request = urlsplit(self.path)
+            if request.path == "/":
+                body, content_type, status = html, "text/html; charset=utf-8", 200
+            elif request.path == "/snapshot":
+                try:
+                    since = int(parse_qs(request.query).get("since", ["0"])[0])
+                    body = json.dumps(session.snapshot(since)).encode("utf-8")
+                    status = 200
+                except (ValueError, OSError, httpx.HTTPError, RuntimeError) as exc:
+                    body = json.dumps({"error": str(exc)}).encode("utf-8")
+                    status = 503
+                content_type = "application/json; charset=utf-8"
+            else:
+                body, content_type, status = b"Not found", "text/plain", 404
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, _format: str, *args) -> None:
+            del args
+
+    try:
+        with LiveHTTPServer(("127.0.0.1", 0), LiveChartHandler) as server:
+            chart_url = f"http://127.0.0.1:{server.server_port}/"
+            print(f"Live chart: {chart_url} (press Ctrl+C to stop)", flush=True)
+            webbrowser.open(chart_url, new=2)
+            try:
+                server.serve_forever(poll_interval=0.2)
+            except KeyboardInterrupt:
+                pass
+            return chart_url
+    finally:
+        session.close()
+
+
 def open_chart_in_browser(html: bytes) -> str:
     """Serve one chart request on loopback, print its URL, and open it."""
 
@@ -292,6 +394,8 @@ def open_chart_in_browser(html: bytes) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.refresh_seconds < 1:
+        raise SystemExit("error: --refresh-seconds must be positive")
 
     try:
         if args.list_games:
@@ -328,17 +432,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             sportsbook_side=args.sportsbook_side,
         )
         frequency = None if args.no_resample else args.frequency
-        figure = build_game_odds_figure(
-            game.compiled,
-            event_ticker=game.event_ticker,
-            target_label=game.target_label,
-            resample_frequency=frequency,
-            show_fee_lines=not args.no_fees,
-            width=args.width,
-            height=args.height,
-            sportsbook_odds=books,
-            pbp_events=events,
-        )
+        def build_figure(current: GameOddsData):
+            return build_game_odds_figure(
+                current.compiled,
+                event_ticker=current.event_ticker,
+                target_label=current.target_label,
+                resample_frequency=frequency,
+                show_fee_lines=not args.no_fees,
+                width=args.width,
+                height=args.height,
+                sportsbook_odds=books,
+                pbp_events=events,
+            )
+
+        figure = build_figure(game)
     except (ValueError, OSError, duckdb.Error, httpx.HTTPError) as exc:
         raise SystemExit(f"error: {exc}") from exc
     except (EOFError, KeyboardInterrupt):
@@ -375,11 +482,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         include_plotlyjs=True,
         full_html=True,
         config=display_config,
+        post_script=volume_rebucket_script(),
     )
     if args.no_show:
         print(f"Chart file: {output_path.as_uri()}")
     elif args.renderer == "browser":
-        open_chart_in_browser(output_path.read_bytes())
+        if source == "api" and args.end_time is None and game_is_unsettled(game):
+            live_script = (
+                Path(__file__).parent
+                / "src"
+                / "analysis"
+                / "kalshi"
+                / "game_live_browser.js"
+            ).read_text(encoding="utf-8").replace(
+                "{refresh_ms}", str(args.refresh_seconds * 1000)
+            )
+            live_html = figure.to_html(
+                include_plotlyjs=True,
+                full_html=True,
+                config=display_config,
+                post_script=[volume_rebucket_script(), live_script],
+            ).encode("utf-8")
+            session = LiveGameSession(game, build_figure, args.refresh_seconds)
+            open_live_chart_in_browser(live_html, session)
+        else:
+            open_chart_in_browser(output_path.read_bytes())
     else:
         print(f"Chart file: {output_path.as_uri()}")
         figure.show(renderer=args.renderer, config=display_config)

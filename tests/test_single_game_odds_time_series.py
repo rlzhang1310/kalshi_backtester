@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import urllib.request
+from dataclasses import replace
 
 import pandas as pd
 import pytest
@@ -12,7 +13,9 @@ from src.analysis.kalshi.single_game_odds_time_series import (
     MAX_RESAMPLED_POINTS,
     build_game_odds_figure,
     compile_event_trades_to_target,
+    game_is_unsettled,
     load_game_odds,
+    refresh_api_game,
 )
 from src.indexers.kalshi.client import KalshiClient
 from src.indexers.kalshi.models import Market
@@ -191,6 +194,111 @@ def test_load_event_combines_tiers_deduplicates_and_infers_target() -> None:
         ("trades", True, cle.ticker)
     )
     assert not client.closed
+
+
+def test_live_refresh_adds_only_new_trades_and_stops_when_settled() -> None:
+    event = "KXNFLGAME-25SEP07CINCLE"
+    cle = make_market(f"{event}-CLE", event, "Cleveland")
+    cin = make_market(f"{event}-CIN", event, "Cincinnati")
+    cle.status = cin.status = "active"
+    first = raw_trade("first", "0.6000", "2025-09-07T17:00:00Z")
+    second = raw_trade("second", "0.6500", "2025-09-07T17:00:01Z")
+    client = FakeClient(
+        live_markets={event: [cle, cin]},
+        live_trades={cle.ticker: [first]},
+    )
+    game = load_game_odds(event, client=client)
+    assert game_is_unsettled(game)
+
+    client.live_trades[cle.ticker] = [first, second]
+    assert refresh_api_game(game, client)
+    assert game.trades.trade_id.tolist() == ["first", "second"]
+    assert game.compiled.target_raw_prob.tolist() == pytest.approx([0.6, 0.65])
+    assert not refresh_api_game(game, client)
+
+    client.live_markets[event] = [
+        replace(cle, status="settled"),
+        replace(cin, status="settled"),
+    ]
+    assert refresh_api_game(game, client)
+    assert not game_is_unsettled(game)
+    assert game.trades.trade_id.tolist() == ["first", "second"]
+
+
+def test_live_session_only_sends_changed_snapshots() -> None:
+    event = "KXNFLGAME-25SEP07CINCLE"
+    cle = make_market(f"{event}-CLE", event, "Cleveland")
+    cin = make_market(f"{event}-CIN", event, "Cincinnati")
+    cle.status = cin.status = "active"
+    first = raw_trade("first", "0.6000", "2025-09-07T17:00:00Z")
+    second = raw_trade("second", "0.6500", "2025-09-07T17:00:01Z")
+    client = FakeClient(
+        live_markets={event: [cle, cin]},
+        live_trades={cle.ticker: [first]},
+    )
+    game = load_game_odds(event, client=client)
+    session = visualize_game.LiveGameSession(
+        game,
+        lambda current: build_game_odds_figure(
+            current.compiled, event_ticker=event, target_label="Cleveland"
+        ),
+        refresh_seconds=10,
+        client=client,
+    )
+    client.live_trades[cle.ticker] = [first, second]
+    session.last_poll = 0
+    updated = session.snapshot(0)
+    assert updated["revision"] == 1
+    assert updated["live"] is True
+    assert "figure" in updated
+    assert session.snapshot(1) == {"revision": 1, "live": True}
+
+    client.live_markets[event] = [
+        replace(cle, status="settled"),
+        replace(cin, status="settled"),
+    ]
+    session.last_poll = 0
+    settled = session.snapshot(1)
+    assert settled["revision"] == 2
+    assert settled["live"] is False
+    assert "figure" in settled
+    session.close()
+    assert client.closed
+
+
+def test_cli_opens_live_browser_for_unsettled_api_game(monkeypatch, tmp_path) -> None:
+    event = "KXNFLGAME-25SEP07CINCLE"
+    cle = make_market(f"{event}-CLE", event, "Cleveland")
+    cin = make_market(f"{event}-CIN", event, "Cincinnati")
+    cle.status = cin.status = "active"
+    client = FakeClient(
+        live_markets={event: [cle, cin]},
+        live_trades={
+            cle.ticker: [raw_trade("first", "0.6000", "2025-09-07T17:00:00Z")]
+        },
+    )
+    game = load_game_odds(event, client=client)
+    monkeypatch.setattr(visualize_game, "load_game_odds", lambda *args, **kwargs: game)
+    monkeypatch.setattr(
+        visualize_game,
+        "load_game_overlays",
+        lambda *args, **kwargs: (pd.DataFrame(), pd.DataFrame()),
+    )
+    monkeypatch.setattr(visualize_game, "KalshiClient", lambda: client)
+    captured = {}
+
+    def open_live(html, session):
+        captured["html"] = html
+        captured["interval"] = session.refresh_seconds
+        session.close()
+
+    monkeypatch.setattr(visualize_game, "open_live_chart_in_browser", open_live)
+    output = tmp_path / "live.html"
+    assert visualize_game.main([event, "--output-html", str(output)]) == 0
+    assert output.exists()
+    assert b"/snapshot?since=" in captured["html"]
+    assert captured["interval"] == 10
+    assert client.closed
 
 
 def test_omitted_start_uses_kalshi_milestone_and_filters_pregame_trades() -> None:
@@ -408,6 +516,12 @@ def test_build_figure_matches_reference_format_and_resamples() -> None:
     assert figure.layout.xaxis.automargin is True
     assert figure.layout.yaxis.automargin is True
     assert "EVENT" in figure.layout.title.text
+    assert figure.layout.xaxis.minallowed == "2025-12-31T23:59:59+00:00"
+    assert figure.layout.xaxis.maxallowed == "2026-01-01T00:00:33+00:00"
+    assert list(figure.layout.xaxis.range) == [
+        figure.layout.xaxis.minallowed,
+        figure.layout.meta["time_bounds"]["right"],
+    ]
 
 
 def test_raw_figure_is_step_line_and_can_hide_fees() -> None:
@@ -429,6 +543,79 @@ def test_raw_figure_is_step_line_and_can_hide_fees() -> None:
 
     assert len(figure.data) == 1
     assert figure.data[0].line.shape == "hv"
+
+
+def test_zoom_bounds_leave_right_side_room_without_moving_initial_view() -> None:
+    compiled = pd.DataFrame(
+        {
+            "timestamp": ["2026-01-01T00:00:00Z", "2026-01-01T02:00:00Z"],
+            "target_raw_prob": [0.5, 0.6],
+            "taker_prob": [0.5, 0.6],
+            "maker_prob": [0.5, 0.6],
+        }
+    )
+    figure = build_game_odds_figure(
+        compiled, event_ticker="EVENT", target_label="Home", resample_frequency=None
+    )
+    axis = figure.layout.xaxis
+    assert axis.minallowed == axis.range[0]
+    assert axis.range[1] == figure.layout.meta["time_bounds"]["right"]
+    assert axis.maxallowed == "2026-01-01T03:14:24+00:00"
+
+
+def test_volume_uses_contract_counts_and_chart_interval() -> None:
+    compiled = pd.DataFrame(
+        {
+            "timestamp": [
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:02Z",
+            ],
+            "target_raw_prob": [0.4, 0.5, 0.6],
+            "taker_prob": [0.4, 0.5, 0.6],
+            "maker_prob": [0.4, 0.5, 0.6],
+            "count": [2, 3, 4],
+        }
+    )
+    for frequency in (None, "1s"):
+        figure = build_game_odds_figure(
+            compiled,
+            event_ticker="EVENT",
+            target_label="Home",
+            resample_frequency=frequency,
+        )
+        volume = figure.data[-1]
+        assert volume.name == "Volume"
+        assert volume.type == "bar"
+        assert list(volume.y) == [5, 4]
+        assert volume.xaxis == "x2" and volume.yaxis == "y2"
+        assert figure.layout.xaxis2.matches == "x"
+        assert figure.layout.xaxis2.minallowed == figure.layout.xaxis.minallowed
+        assert figure.layout.xaxis2.maxallowed == figure.layout.xaxis.maxallowed
+        assert figure.layout.yaxis2.title.text == "Volume (contracts)"
+
+
+def test_volume_uses_wider_summed_buckets_for_longer_games() -> None:
+    compiled = pd.DataFrame(
+        {
+            "timestamp": [
+                "2026-01-01T00:00:00Z",
+                "2026-01-01T00:00:02Z",
+                "2026-01-01T00:09:00Z",
+            ],
+            "target_raw_prob": [0.4, 0.5, 0.6],
+            "taker_prob": [0.4, 0.5, 0.6],
+            "maker_prob": [0.4, 0.5, 0.6],
+            "count": [2, 3, 4],
+        }
+    )
+    figure = build_game_odds_figure(
+        compiled, event_ticker="EVENT", target_label="Home"
+    )
+    volume = figure.data[-1]
+    assert volume.width == 5000
+    assert list(volume.y) == [5, 4]
+    assert volume.meta["counts"] == [2, 3, 4]
 
 
 def test_resample_point_guard_has_actionable_error() -> None:

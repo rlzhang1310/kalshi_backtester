@@ -9,6 +9,7 @@ and optionally adds sportsbook curves and a play-by-play track.
 from __future__ import annotations
 
 import html
+import math
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -23,11 +24,17 @@ import plotly.graph_objects as go
 from src.indexers.kalshi.client import KalshiClient
 from src.indexers.kalshi.models import Market
 from src.analysis.kalshi.local_game_data import DEFAULT_DATA_DIR, LocalGameStore
+from src.analysis.kalshi.rolling_volatility import (
+    DEFAULT_CADENCE_SECONDS,
+    rolling_volatility_payload,
+)
 
 
 TAKER_FEE_RATE = 0.07
 MAKER_FEE_RATE = 0.0175
 MAX_RESAMPLED_POINTS = 2_000_000
+VOLUME_TARGET_BARS = 120
+LIVE_TRADE_OVERLAP_SECONDS = 60
 
 
 class GameOddsClient(Protocol):
@@ -309,12 +316,58 @@ def load_game_odds(
             active_client.close()
 
 
+def game_is_unsettled(game: GameOddsData) -> bool:
+    """A game stays live until all of its outcome markets settle."""
+    return any(market.status.casefold() != "settled" for market in game.markets)
+
+
+def refresh_api_game(game: GameOddsData, client: GameOddsClient) -> bool:
+    """Fetch recent trades and current market status without reloading history."""
+    refreshed_markets = tuple(
+        _find_market(client, market.ticker) or market for market in game.markets
+    )
+    previous_statuses = tuple(market.status for market in game.markets)
+
+    latest = game.trades["timestamp"].max()
+    min_ts = max(
+        int(game.start_time.timestamp()),
+        int(latest.timestamp()) - LIVE_TRADE_OVERLAP_SECONDS,
+    )
+    trade_markets = (
+        list(refreshed_markets)
+        if len(refreshed_markets) == 2
+        else [next(m for m in refreshed_markets if m.ticker == game.target_ticker)]
+    )
+    recent = _load_complete_trades(
+        client=client,
+        markets=trade_markets,
+        event_ticker=game.event_ticker,
+        min_ts=min_ts,
+        max_ts=None,
+    )
+    game.markets = refreshed_markets
+    if not recent.empty:
+        new_trades = recent[~recent["trade_id"].isin(game.trades["trade_id"])]
+        if not new_trades.empty:
+            game.trades = (
+                pd.concat([game.trades, new_trades], ignore_index=True)
+                .sort_values(["timestamp", "trade_id"], kind="stable")
+                .reset_index(drop=True)
+            )
+            game.compiled = compile_event_trades_to_target(
+                game.trades, game.target_ticker, game.target_side
+            )
+            return True
+    return previous_statuses != tuple(market.status for market in refreshed_markets)
+
+
 def build_game_odds_figure(
     compiled: pd.DataFrame,
     *,
     event_ticker: str,
     target_label: str,
     resample_frequency: str | None = "1s",
+    volatility_cadence_seconds: int = DEFAULT_CADENCE_SECONDS,
     show_fee_lines: bool = True,
     width: int = 2500,
     height: int = 1300,
@@ -402,6 +455,9 @@ def build_game_odds_figure(
             "event_ticker": event_ticker,
             "target_label": target_label,
             "resample_frequency": resample_frequency,
+            "rolling_volatility": rolling_volatility_payload(
+                compiled, cadence_seconds=volatility_cadence_seconds
+            ),
         },
     )
     figure.update_yaxes(
@@ -427,7 +483,9 @@ def build_game_odds_figure(
 
     from src.analysis.kalshi.game_overlays import add_game_overlays
 
-    return add_game_overlays(figure, compiled, sportsbook_odds, pbp_events)
+    figure = add_game_overlays(figure, compiled, sportsbook_odds, pbp_events)
+    figure = _add_volume_panel(figure, compiled, resample_frequency)
+    return _constrain_time_axis(figure, compiled)
 
 
 def figure_display_config(
@@ -456,6 +514,11 @@ def figure_display_config(
             "scale": 2,
         },
     }
+
+
+def volume_rebucket_script() -> str:
+    """Browser handler that sums volume into buckets for the visible time span."""
+    return Path(__file__).with_name("game_volume_browser.js").read_text(encoding="utf-8")
 
 
 def visualize_game_odds(
@@ -830,6 +893,126 @@ def _trade_count(trade: dict[str, Any]) -> float | int | None:
     except (InvalidOperation, TypeError):
         return None
     return int(count) if count == count.to_integral_value() else float(count)
+
+
+def _add_volume_panel(
+    figure: go.Figure,
+    compiled: pd.DataFrame,
+    frequency: str | None,
+) -> go.Figure:
+    """Show traded contracts per interval below the odds and event tracks."""
+    if "count" not in compiled:
+        return figure
+    volume = compiled[["timestamp", "count"]].copy()
+    volume["timestamp"] = pd.to_datetime(volume["timestamp"], utc=True, errors="coerce")
+    volume["count"] = pd.to_numeric(volume["count"], errors="coerce")
+    volume = volume.dropna(subset=["timestamp", "count"])
+    volume = volume[volume["count"] >= 0]
+    if volume.empty:
+        return figure
+    volume = volume.set_index("timestamp")["count"].groupby(level=0).sum()
+    minimum_ms = (
+        max(1, math.ceil(pd.to_timedelta(frequency).total_seconds() * 1000))
+        if frequency
+        else 1
+    )
+    span_ms = (volume.index.max() - volume.index.min()).total_seconds() * 1000
+    bucket_ms = _volume_bucket_ms(span_ms, minimum_ms)
+    bucketed = _bucket_volume(volume, bucket_ms)
+
+    has_events = "yaxis2" in figure.layout
+    axis_number = 3 if has_events else 2
+    xaxis = f"x{axis_number}"
+    yaxis = f"y{axis_number}"
+    xlayout = f"xaxis{axis_number}"
+    ylayout = f"yaxis{axis_number}"
+    figure.add_trace(
+        go.Bar(
+            x=bucketed.index + pd.to_timedelta(bucket_ms / 2, unit="ms"),
+            y=bucketed.to_numpy(),
+            width=bucket_ms,
+            xaxis=xaxis,
+            yaxis=yaxis,
+            name="Volume",
+            marker_color="#8294ba",
+            hovertemplate="Bucket center=%{x}<br>Contracts=%{y:,.0f}<extra></extra>",
+            meta={
+                "timestamps": [timestamp.isoformat() for timestamp in volume.index],
+                "counts": volume.tolist(),
+                "minimum_ms": minimum_ms,
+                "bucket_ms": bucket_ms,
+            },
+        )
+    )
+    if has_events:
+        figure.update_layout(
+            yaxis=dict(domain=[0.36, 1]),
+            yaxis2=dict(domain=[0.21, 0.30]),
+            xaxis2=dict(showticklabels=False, title=None),
+        )
+    else:
+        figure.update_layout(yaxis=dict(domain=[0.26, 1]))
+    figure.update_layout(
+        xaxis=dict(showticklabels=False, title=None),
+        **{
+            xlayout: dict(
+                anchor=yaxis,
+                matches="x",
+                title="Timestamp (UTC)",
+                tickformat="%H:%M:%S<br>%Y-%m-%d",
+            ),
+            ylayout: dict(
+                domain=[0, 0.14 if has_events else 0.17],
+                anchor=xaxis,
+                title="Volume (contracts)",
+                fixedrange=True,
+                rangemode="tozero",
+                gridcolor="rgba(0,0,0,0.08)",
+                zeroline=False,
+            ),
+        },
+    )
+    return figure
+
+
+def _volume_bucket_ms(span_ms: float, minimum_ms: int) -> int:
+    """Choose a readable interval with roughly 120 bars across the view."""
+    desired = max(minimum_ms, span_ms / VOLUME_TARGET_BARS)
+    magnitude = 10 ** math.floor(math.log10(desired))
+    for multiplier in (1, 2, 5, 10):
+        candidate = multiplier * magnitude
+        if candidate >= desired:
+            return int(candidate)
+    raise AssertionError("unreachable volume bucket size")
+
+
+def _constrain_time_axis(figure: go.Figure, compiled: pd.DataFrame) -> go.Figure:
+    """Start near the trades, with a firm left edge and breathing room on the right."""
+    timestamps = pd.to_datetime(compiled["timestamp"], utc=True, errors="coerce").dropna()
+    if timestamps.empty:
+        return figure
+    span = timestamps.max() - timestamps.min()
+    padding = max(span * 0.02, pd.Timedelta(seconds=1))
+    if span == pd.Timedelta(0):
+        padding = pd.Timedelta(seconds=30)
+    lower = (timestamps.min() - padding).isoformat()
+    upper = (timestamps.max() + padding).isoformat()
+    soft_upper = (
+        timestamps.max() + padding + max(span * 0.60, pd.Timedelta(seconds=30))
+    ).isoformat()
+    figure.update_xaxes(range=[lower, upper], minallowed=lower, maxallowed=soft_upper)
+    figure.update_layout(
+        meta={
+            **dict(figure.layout.meta or {}),
+            "time_bounds": {"left": lower, "right": upper},
+        }
+    )
+    return figure
+
+
+def _bucket_volume(volume: pd.Series, bucket_ms: int) -> pd.Series:
+    bins = (volume.index.as_unit("ms").asi8 // bucket_ms) * bucket_ms
+    return volume.groupby(pd.to_datetime(bins, unit="ms", utc=True)).sum()
 
 
 def _resample_for_plot(

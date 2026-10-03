@@ -6,6 +6,7 @@ from src.analysis.kalshi.local_game_data import DEFAULT_DATA_DIR, list_local_gam
 from src.analysis.kalshi.single_game_odds_time_series import (
     figure_display_config,
     visualize_game_odds,
+    volume_rebucket_script,
 )
 from src.analysis.kalshi.util.sports_markets import SPORT_LABELS
 
@@ -190,13 +191,21 @@ def game_picker(data_dir: str | Path = DEFAULT_DATA_DIR):
                     config["toImageButtonOptions"]["filename"] + ".html"
                 )
                 output.parent.mkdir(parents=True, exist_ok=True)
-                figure.write_html(output, include_plotlyjs=True, config=config)
+                figure.write_html(
+                    output,
+                    include_plotlyjs=True,
+                    config=config,
+                    post_script=volume_rebucket_script(),
+                )
                 chart.clear_output(wait=True)
                 print(f"Saved interactive chart: {output.resolve()}")
                 display(
                     HTML(
                         figure.to_html(
-                            full_html=False, include_plotlyjs=True, config=config
+                            full_html=False,
+                            include_plotlyjs=True,
+                            config=config,
+                            post_script=volume_rebucket_script(),
                         )
                     )
                 )

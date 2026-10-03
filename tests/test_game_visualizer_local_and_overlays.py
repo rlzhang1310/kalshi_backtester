@@ -178,15 +178,18 @@ def test_menu_honors_explicit_source_and_can_quit(tmp_path, monkeypatch):
     assert exc.value.code == 0
 
 
-def test_absent_and_empty_overlays_leave_single_panel_chart(archive):
+def test_absent_and_empty_overlays_leave_odds_and_volume_chart(archive):
     game = load_game_odds(EVENT, source="local", data_dir=archive)
     books, events = load_game_overlays(game, data_dir=archive)
     assert books.empty and events.empty
     figure = visualize_game_odds(
         EVENT, source="local", data_dir=archive, show=False, resample_frequency=None
     )
-    assert len(figure.data) == 3
-    assert "yaxis2" not in figure.layout
+    assert len(figure.data) == 4
+    assert figure.data[-1].name == "Volume"
+    assert list(figure.data[-1].y) == [1, 3]
+    assert "yaxis2" in figure.layout
+    assert "yaxis3" not in figure.layout
     folder = archive / "playbyplay"
     folder.mkdir()
     (folder / f"{EVENT}.csv").write_text("timestamp,event_type\n")
@@ -273,6 +276,12 @@ def test_auto_loaded_pbp_adds_track_and_backward_aligned_scoring_marker(archive)
     assert len(fig.layout.shapes) == 1
     assert "All plays" not in [trace.name for trace in fig.data]
     assert fig.layout.xaxis2.matches == "x"
+    volume = next(trace for trace in fig.data if trace.name == "Volume")
+    assert volume.yaxis == "y3"
+    assert fig.layout.xaxis3.matches == "x"
+    assert fig.layout.xaxis3.minallowed == fig.layout.xaxis.minallowed
+    assert fig.layout.xaxis3.maxallowed == fig.layout.xaxis.maxallowed
+    assert fig.layout.yaxis3.title.text == "Volume (contracts)"
 
 
 def test_book_seed_quote_is_carried_into_chart_window(archive):
@@ -295,9 +304,9 @@ def test_book_seed_quote_is_carried_into_chart_window(archive):
         sportsbook_odds=books,
         resample_frequency=None,
     )
-    assert fig.data[-1].name == "Book"
-    assert list(fig.data[-1].y) == [0.55, 0.55]
-    assert pd.to_datetime(fig.data[-1].x[0], utc=True) == pd.Timestamp(START)
+    book = next(trace for trace in fig.data if trace.name == "Book")
+    assert list(book.y) == [0.55, 0.55]
+    assert pd.to_datetime(book.x[0], utc=True) == pd.Timestamp(START)
 
 
 def test_cli_local_html_and_catalog(archive, capsys):
@@ -319,6 +328,7 @@ def test_cli_local_html_and_catalog(archive, capsys):
         == 0
     )
     assert output.is_file()
+    assert "plotly_relayout" in output.read_text(encoding="utf-8")
     assert "first stored trade; includes pregame" in capsys.readouterr().out
     assert (
         visualize_game.main(
