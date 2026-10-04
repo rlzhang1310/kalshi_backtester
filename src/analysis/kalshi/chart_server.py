@@ -5,11 +5,17 @@ from __future__ import annotations
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
+from typing import Callable
 from urllib.parse import parse_qs, urlsplit
 
 
 class ChartServer:
-    def __init__(self, html: bytes, session=None) -> None:
+    def __init__(
+        self,
+        html: bytes,
+        session=None,
+        metric_provider: Callable[[int | None], dict] | None = None,
+    ) -> None:
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self) -> None:
                 request = urlsplit(self.path)
@@ -19,6 +25,16 @@ class ChartServer:
                     try:
                         since = int(parse_qs(request.query).get("since", ["0"])[0])
                         body = json.dumps(session.snapshot(since)).encode("utf-8")
+                        status = 200
+                    except Exception as exc:
+                        body = json.dumps({"error": str(exc)}).encode("utf-8")
+                        status = 503
+                    content_type = "application/json; charset=utf-8"
+                elif request.path == "/metrics" and metric_provider is not None:
+                    try:
+                        raw_at = parse_qs(request.query).get("at", [None])[0]
+                        at_ms = int(raw_at) if raw_at is not None else None
+                        body = json.dumps(metric_provider(at_ms)).encode("utf-8")
                         status = 200
                     except Exception as exc:
                         body = json.dumps({"error": str(exc)}).encode("utf-8")

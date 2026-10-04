@@ -47,4 +47,7 @@
     button.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Enter browser fullscreen';
   });
   document.body.appendChild(button);
+  if (panel && window.ResizeObserver) {
+    new ResizeObserver(() => { resize(); positionButton(); }).observe(panel);
+  }
 })();

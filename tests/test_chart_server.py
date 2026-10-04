@@ -11,7 +11,10 @@ def test_chart_server_serves_chart_and_versioned_snapshot() -> None:
         def snapshot(self, since):
             return {"revision": since + 1, "live": True}
 
-    server = ChartServer(b"<html>chart</html>", Session())
+    server = ChartServer(
+        b"<html>chart</html>", Session(),
+        metric_provider=lambda at: {"as_of_ms": at, "values": [0.0]},
+    )
     try:
         with urlopen(server.url) as response:
             assert response.read() == b"<html>chart</html>"
@@ -19,5 +22,7 @@ def test_chart_server_serves_chart_and_versioned_snapshot() -> None:
             assert response.read() == b"<html>chart</html>"
         with urlopen(server.url + "snapshot?since=3") as response:
             assert json.load(response) == {"revision": 4, "live": True}
+        with urlopen(server.url + "metrics?at=123") as response:
+            assert json.load(response) == {"as_of_ms": 123, "values": [0.0]}
     finally:
         server.close()

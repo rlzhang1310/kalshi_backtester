@@ -190,6 +190,7 @@ def load_game_odds(
     client: GameOddsClient | None = None,
     source: str = "api",
     data_dir: str | Path = DEFAULT_DATA_DIR,
+    allow_empty: bool = False,
 ) -> GameOddsData:
     """Discover, fetch, and normalize the trades for one Kalshi game.
 
@@ -201,6 +202,8 @@ def load_game_odds(
     Kalshi's linked sports milestone. With source='local', the entire stored
     trade history is used unless a start is provided; no API call is made.
     Events with more than two outcomes use only the selected market's trades.
+    ``allow_empty`` permits an unsettled API game with no initial trades so a
+    live UI can wait for its first price; CLI callers keep the error default.
     """
     requested_start = _to_utc_timestamp(start_time, "start_time")
     end = _to_utc_timestamp(end_time, "end_time")
@@ -281,23 +284,38 @@ def load_game_odds(
             min_ts=min_ts,
             max_ts=max_ts,
         )
-        if trades.empty:
+        permit_waiting = allow_empty and end is None and any(
+            market.status.casefold() != "settled" for market in markets
+        )
+        if trades.empty and not permit_waiting:
             raise ValueError(
                 f"No trades were returned for the selected market(s) in {event_ticker!r}."
             )
+        if trades.empty:
+            trades = pd.DataFrame(columns=[
+                "trade_id", "event_ticker", "ticker", "source_side", "timestamp",
+                "yes_price", "no_price", "count", "taker_side",
+            ])
+            trades["timestamp"] = pd.Series(dtype="datetime64[ns, UTC]")
 
         if start is not None:
             trades = trades[trades["timestamp"] >= start]
         if end is not None:
             trades = trades[trades["timestamp"] <= end]
         trades = trades.reset_index(drop=True)
-        if trades.empty:
+        if trades.empty and not permit_waiting:
             raise ValueError("No trades remain inside the requested time range.")
 
-        compiled = compile_event_trades_to_target(
-            trades,
-            target_ticker=target_market.ticker,
-            target_side=target_side,
+        compiled = (
+            compile_event_trades_to_target(
+                trades,
+                target_ticker=target_market.ticker,
+                target_side=target_side,
+            )
+            if not trades.empty
+            else pd.DataFrame(columns=[
+                "timestamp", "target_raw_prob", "taker_prob", "maker_prob", "count"
+            ])
         )
 
         return GameOddsData(
@@ -328,10 +346,14 @@ def refresh_api_game(game: GameOddsData, client: GameOddsClient) -> bool:
     )
     previous_statuses = tuple(market.status for market in game.markets)
 
-    latest = game.trades["timestamp"].max()
-    min_ts = max(
-        int(game.start_time.timestamp()),
-        int(latest.timestamp()) - LIVE_TRADE_OVERLAP_SECONDS,
+    latest = game.trades["timestamp"].max() if not game.trades.empty else None
+    min_ts = (
+        max(
+            int(game.start_time.timestamp()),
+            int(latest.timestamp()) - LIVE_TRADE_OVERLAP_SECONDS,
+        )
+        if latest is not None
+        else int(game.start_time.timestamp())
     )
     trade_markets = (
         list(refreshed_markets)

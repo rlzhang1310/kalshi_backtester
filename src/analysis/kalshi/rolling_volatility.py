@@ -1,90 +1,158 @@
-"""Realized volatility from observed, fixed-cadence game prices.
+"""Rolling movement metrics from a clock-sampled target-side price series.
 
-The chart currently has timestamped trades, but no timestamped bid/ask quotes.
-We therefore use its trade-implied probability, taking the last *observed*
-trade in each selected time bucket. Empty buckets are never forward-filled.
+Trades provide the chart's price history; timestamped bid/ask history is not
+available. Samples carry the last known price forward, never backward before
+the first trade. The same helper serves historical and both live UI modes.
 """
 
 from __future__ import annotations
 
-from bisect import bisect_left
 from math import sqrt
 
+import numpy as np
 import pandas as pd
 
 
 DEFAULT_CADENCE_SECONDS = 3
 WINDOWS_SECONDS = (60, 300, 600, 1800)
-# Wider windows can tolerate wider trade spacing without inventing prices
-# in empty time buckets.
-MAX_GAP_SECONDS = (30, 120, 180, 600)
-START_TOLERANCE_SECONDS = (10, 60, 120, 360)
+PRICE_SOURCE = (
+    "Kalshi trade-implied target probability; "
+    "timestamped bid/ask history unavailable"
+)
+
+
+def _movement_metrics(prices: np.ndarray, seconds: int) -> dict[str, float]:
+    """Return accumulated metrics and their 1-minute equivalents."""
+    differences = np.diff(prices)
+    upward = differences[differences > 0]
+    downward = differences[differences < 0]
+    up_squared = 10_000 * float(np.dot(upward, upward))
+    down_squared = 10_000 * float(np.dot(downward, downward))
+    two_way_squared = 2 * min(up_squared, down_squared)
+    minute_factor = sqrt(60 / seconds)
+    volatility = sqrt(up_squared + down_squared)
+    up = sqrt(up_squared)
+    down = sqrt(down_squared)
+    two_way = sqrt(two_way_squared)
+    return {
+        "values": round(volatility, 6),
+        "per_minute": round(volatility * minute_factor, 6),
+        "up": round(up, 6),
+        "down": round(down, 6),
+        "two_way": round(two_way, 6),
+        "up_per_minute": round(up * minute_factor, 6),
+        "down_per_minute": round(down * minute_factor, 6),
+        "two_way_per_minute": round(two_way * minute_factor, 6),
+    }
 
 
 def rolling_volatility_payload(
-    compiled: pd.DataFrame, *, cadence_seconds: int = DEFAULT_CADENCE_SECONDS
+    compiled: pd.DataFrame,
+    *,
+    cadence_seconds: int = DEFAULT_CADENCE_SECONDS,
+    as_of: pd.Timestamp | int | None = None,
 ) -> dict:
-    """Return as-of samples and window volatility in percentage points.
+    """Compute realized movement metrics as of a time, using no future trades.
 
-    A window is available only when an observed sample covers its beginning
-    within its tolerance and no adjacent observations exceed its gap limit.
-    Each returned timestamp is the actual last-trade time of its bucket,
-    so selecting the last sample at or before a chart cursor cannot leak future
-    observations from the same bucket.
+    Integer ``as_of`` values are UTC epoch milliseconds. With ``None``, the
+    latest observed trade is the as-of time. Only the longest window of
+    sampled prices is materialized; the full-game path keeps only bucket-end
+    trade prices, so long quiet periods do not expand memory use.
     """
     if (
         isinstance(cadence_seconds, bool)
         or not isinstance(cadence_seconds, int)
         or not 1 <= cadence_seconds <= 60
     ):
-        raise ValueError("volatility cadence must be an integer from 1 to 60 seconds")
+        raise ValueError("price metric cadence must be an integer from 1 to 60 seconds")
+
     frame = compiled[["timestamp", "target_raw_prob"]].copy()
     frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
     frame["target_raw_prob"] = pd.to_numeric(frame["target_raw_prob"], errors="coerce")
     frame = frame.dropna().sort_values("timestamp", kind="stable")
     frame = frame[frame["target_raw_prob"].between(0, 1)]
-    buckets = frame["timestamp"].dt.floor(f"{cadence_seconds}s")
-    frame = frame.loc[~buckets.duplicated(keep="last")]
+    if as_of is None:
+        as_of_time = frame["timestamp"].iloc[-1] if not frame.empty else None
+    elif isinstance(as_of, bool):
+        raise ValueError("as_of must be a UTC timestamp or epoch milliseconds")
+    elif isinstance(as_of, int):
+        as_of_time = pd.Timestamp(as_of, unit="ms", tz="UTC")
+    else:
+        as_of_time = pd.Timestamp(as_of)
+        if as_of_time.tzinfo is None:
+            as_of_time = as_of_time.tz_localize("UTC")
+        else:
+            as_of_time = as_of_time.tz_convert("UTC")
 
-    times = [int(value.value // 1_000_000) for value in frame["timestamp"]]
-    prices = frame["target_raw_prob"].tolist()
-    squared = [0.0]
-    gaps = [[0] for _ in WINDOWS_SECONDS]
-    for index in range(1, len(times)):
-        squared.append(squared[-1] + (prices[index] - prices[index - 1]) ** 2)
-        interval_ms = times[index] - times[index - 1]
-        for gap_counts, limit in zip(gaps, MAX_GAP_SECONDS):
-            gap_counts.append(gap_counts[-1] + int(interval_ms > limit * 1000))
-
-    samples = []
-    for index, timestamp in enumerate(times):
-        values = []
-        per_minute = []
-        reasons = []
-        for window_index, seconds in enumerate(WINDOWS_SECONDS):
-            cutoff = timestamp - seconds * 1000
-            first = bisect_left(times, cutoff)
-            if first == index or times[first] > cutoff + START_TOLERANCE_SECONDS[window_index] * 1000:
-                values.append(None)
-                per_minute.append(None)
-                reasons.append("insufficient window coverage")
-            elif gaps[window_index][index] != gaps[window_index][first]:
-                values.append(None)
-                per_minute.append(None)
-                reasons.append("data gap / unsupported resolution")
-            else:
-                realized_pp = 100 * sqrt(max(0.0, squared[index] - squared[first]))
-                values.append(round(realized_pp, 6))
-                per_minute.append(round(realized_pp * sqrt(60 / seconds), 6))
-                reasons.append(None)
-        samples.append({"t": timestamp, "values": values, "per_minute": per_minute, "reasons": reasons})
-
-    return {
+    payload = {
         "cadence_seconds": cadence_seconds,
-        "max_gap_seconds": list(MAX_GAP_SECONDS),
-        "start_tolerance_seconds": list(START_TOLERANCE_SECONDS),
         "windows_seconds": list(WINDOWS_SECONDS),
         "normalization_seconds": 60,
-        "source": "Kalshi trade-implied probability (historical bid/ask midpoints unavailable)",
-        "samples": samples,
+        "source": PRICE_SOURCE,
+        "as_of_ms": int(as_of_time.value // 1_000_000) if as_of_time is not None else None,
+        "last_trade_ms": None,
+        "game": None,
+        "samples": [],
     }
+    if as_of_time is None:
+        return payload
+    frame = frame.loc[frame["timestamp"] <= as_of_time]
+    if frame.empty:
+        return payload
+
+    trade_times = frame["timestamp"].astype("int64").to_numpy()
+    trade_prices = frame["target_raw_prob"].to_numpy(dtype=float)
+    first_ns = int(trade_times[0])
+    cadence_ns = cadence_seconds * 1_000_000_000
+    count = int((as_of_time.value - first_ns) // cadence_ns) + 1
+    known_seconds = max(1, int((as_of_time.value - first_ns) // 1_000_000_000) + 1)
+    longest_count = max(
+        (window + cadence_seconds - 1) // cadence_seconds
+        for window in WINDOWS_SECONDS
+    )
+    first_index = max(0, count - longest_count)
+    indices = np.arange(first_index, count, dtype=np.int64)
+    sample_times = as_of_time.value - (count - 1 - indices) * cadence_ns
+    observed_indices = np.searchsorted(trade_times, sample_times, side="right") - 1
+    prices = trade_prices[observed_indices]
+    payload["last_trade_ms"] = int(trade_times[observed_indices[-1]] // 1_000_000)
+
+    # A trade affects the sampled path at the first grid time at or after it.
+    # Keep the last trade in each bucket; empty buckets carry forward.
+    first_sample_ns = as_of_time.value - (count - 1) * cadence_ns
+    buckets = (trade_times - first_sample_ns + cadence_ns - 1) // cadence_ns
+    bucket_ends = np.r_[buckets[1:] != buckets[:-1], True]
+    game_prices = trade_prices[bucket_ends]
+    payload["game"] = {
+        **_movement_metrics(game_prices, known_seconds),
+        "coverage_seconds": known_seconds,
+    }
+
+    metric_names = (
+        "values", "per_minute", "up",
+        "down", "two_way", "up_per_minute",
+        "down_per_minute", "two_way_per_minute",
+    )
+    rolling = {name: [] for name in metric_names}
+    partial = []
+    coverage_seconds = []
+    for window in WINDOWS_SECONDS:
+        requested_count = (window + cadence_seconds - 1) // cadence_seconds
+        available_count = min(count, requested_count)
+        window_prices = prices[-available_count:]
+        effective_seconds = min(window, known_seconds)
+        metrics = _movement_metrics(window_prices, effective_seconds)
+        for name in metric_names:
+            rolling[name].append(metrics[name])
+        partial.append(known_seconds < window)
+        coverage_seconds.append(effective_seconds)
+
+    payload["samples"] = [
+        {
+            "t": int(sample_times[-1] // 1_000_000),
+            **rolling,
+            "partial": partial,
+            "coverage_seconds": coverage_seconds,
+        }
+    ]
+    return payload

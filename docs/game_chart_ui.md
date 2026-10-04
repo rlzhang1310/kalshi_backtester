@@ -30,11 +30,13 @@ Relative private-key paths are resolved from the project root. Keep the key
 local; the browser talks only to the loopback chart server. Switching modes
 closes the active poller or WebSocket session. If an event is settled, use
 Historical or Kalshi API mode rather than WebSocket.
+An unsettled API/WebSocket game with no trades yet opens a waiting chart and
+shows Loading for price metrics until its first valid trade arrives.
 
 In **Chart options**, the **Price line display interval** changes only how the
-line is drawn; it does not change the volatility calculation. **Volatility
-sample cadence (seconds)** sets fixed time buckets for the metric (default 3,
-range 1-60). Change it and load/start the chart again to apply it. Changing
+line is drawn; it does not change the price metrics. **Price metric sample
+cadence (seconds)** sets the regular sampling interval for all movement metrics
+(default 3, range 1-60). Change it and load/start the chart again. Changing
 games starts a fresh volatility history. The chart keeps the selected legend
 visibility and zoom when live data arrives.
 
@@ -44,11 +46,14 @@ wheel. **Open chart in new tab** gives the chart its own viewport, with an
 optional **Enter browser fullscreen** button. Reload an already-open chart
 after changing app source code: its HTML is generated when the chart loads.
 
-Below volume are rolling realized-volatility readings for 1m, 5m, 10m, and
-30m. Each shows accumulated movement and a 1-minute-equivalent value. Hover
-the historical chart to inspect an as-of reading; live values update with
-the chart. See [rolling_volatility.md](rolling_volatility.md) for the formula,
-sampling cadence, source, and reasons for N/A.
+Below volume are an all-game summary and 1m, 5m, 10m, and 30m readings for
+realized volatility, Up movement, Down movement, and Two-way movement.
+Each is displayed in percentage points, with accumulated and 1-minute-equivalent
+values using the same square-root time scaling. Hover the historical
+chart to inspect an as-of reading; live values advance with time even without
+new trades. See [rolling_volatility.md](rolling_volatility.md) for sampling,
+source, warm-up, and stale-feed behavior, and
+[price_movement_metrics.md](price_movement_metrics.md) for all four formulas.
 
 ## Implementation and checks
 
@@ -57,8 +62,8 @@ sampling cadence, source, and reasons for N/A.
 `src/analysis/kalshi/chart_server.py`; live sessions produce replacement
 figures without remounting the page. The common calculation is in
 `src/analysis/kalshi/rolling_volatility.py`; the browser row in
-`src/analysis/kalshi/game_volatility_browser.js` selects precomputed values
-for the chart cursor. This keeps the three modes on the same formula and
-cadence. Relevant tests are `tests/test_rolling_volatility.py`,
+`src/analysis/kalshi/game_volatility_browser.js` requests as-of values from
+the local chart server. This keeps the three modes on the same formulas and
+cadence without redrawing Plotly every second. Relevant tests are `tests/test_rolling_volatility.py`,
 `tests/test_api_chart_mode.py`, `tests/test_live_game_stream.py`, and
 `tests/test_chart_server.py`.

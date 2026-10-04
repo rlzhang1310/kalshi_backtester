@@ -11,6 +11,7 @@ from pathlib import Path
 import duckdb
 import httpx
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from live_game import load_websocket_credentials
@@ -19,6 +20,7 @@ from src.analysis.kalshi.game_overlays import load_game_overlays
 from src.analysis.kalshi.live_game_stream import WebSocketGameSession
 from src.analysis.kalshi.local_game_data import DEFAULT_DATA_DIR, list_local_games
 from src.analysis.kalshi.rolling_volatility import DEFAULT_CADENCE_SECONDS
+from src.analysis.kalshi.rolling_volatility import rolling_volatility_payload
 from src.analysis.kalshi.single_game_odds_time_series import (
     build_game_odds_figure,
     figure_display_config,
@@ -66,6 +68,7 @@ def load_chart(
         end_time=end.strip() or None,
         source="local" if mode == "Historical" else "api",
         data_dir=data_dir,
+        allow_empty=mode != "Historical" and not end.strip(),
     )
     if mode == "Live WebSocket" and not game_is_unsettled(game):
         raise ValueError("This game is settled. Use Kalshi API mode for its chart.")
@@ -74,18 +77,47 @@ def load_chart(
         books, events = load_game_overlays(game, data_dir=data_dir)
 
     def build(current):
-        figure = build_game_odds_figure(
-            current.compiled,
-            event_ticker=current.event_ticker,
-            target_label=current.target_label,
-            resample_frequency=None if frequency == "Raw trades" else frequency,
-            volatility_cadence_seconds=volatility_cadence_seconds,
-            show_fee_lines=show_fees,
-            width=1250,
-            height=750,
-            sportsbook_odds=books,
-            pbp_events=events,
-        )
+        if current.compiled.empty:
+            left = max(
+                current.start_time,
+                pd.Timestamp.now(tz="UTC") - pd.Timedelta(minutes=5),
+            )
+            right = left + pd.Timedelta(minutes=30)
+            figure = go.Figure()
+            figure.add_trace(go.Scatter(x=[], y=[], name="Kalshi", mode="lines"))
+            figure.add_trace(go.Bar(
+                x=[], y=[], name="Volume", xaxis="x2", yaxis="y2",
+                meta={"timestamps": [], "counts": [], "minimum_ms": 1000, "bucket_ms": 1000},
+            ))
+            figure.update_layout(
+                title=f"{current.target_label} Implied Probability — waiting for first trade",
+                height=750,
+                xaxis={"range": [left.isoformat(), right.isoformat()], "minallowed": left.isoformat(),
+                       "maxallowed": (right + pd.Timedelta(minutes=30)).isoformat()},
+                xaxis2={"matches": "x", "anchor": "y2"},
+                yaxis={"range": [0, 1], "domain": [0.26, 1], "tickformat": ".0%"},
+                yaxis2={"domain": [0, 0.17], "anchor": "x2", "title": "Volume (contracts)"},
+                meta={
+                    "event_ticker": current.event_ticker,
+                    "rolling_volatility": rolling_volatility_payload(
+                        current.compiled, cadence_seconds=volatility_cadence_seconds
+                    ),
+                    "time_bounds": {"left": left.isoformat(), "right": right.isoformat()},
+                },
+            )
+        else:
+            figure = build_game_odds_figure(
+                current.compiled,
+                event_ticker=current.event_ticker,
+                target_label=current.target_label,
+                resample_frequency=None if frequency == "Raw trades" else frequency,
+                volatility_cadence_seconds=volatility_cadence_seconds,
+                show_fee_lines=show_fees,
+                width=1250,
+                height=750,
+                sportsbook_odds=books,
+                pbp_events=events,
+            )
         figure.update_layout(width=None, autosize=True)
         if initial_dark:
             figure.update_layout(
@@ -132,7 +164,10 @@ def load_chart(
         volatility_script = (
             Path(__file__).parent / "src" / "analysis" / "kalshi"
             / "game_volatility_browser.js"
-        ).read_text(encoding="utf-8")
+        ).read_text(encoding="utf-8").replace(
+            "{live_clock}",
+            "true" if mode != "Historical" and not end.strip() and game_is_unsettled(game) else "false",
+        )
         scripts = [volume_rebucket_script(), theme_script, zoom_script, volatility_script]
         if session is not None:
             live_script = (
@@ -162,7 +197,24 @@ def load_chart(
                 1,
             )
         html = html.encode("utf-8")
-        server = ChartServer(html, session)
+        def metric_snapshot(at_ms: int | None) -> dict:
+            current_session = (
+                session.session if isinstance(session, ToggleablePollingSession) else session
+            )
+            if current_session is None:
+                compiled = game.compiled
+            else:
+                with current_session.lock:
+                    # Live sessions replace this frame, so retaining its
+                    # reference is safe while the helper reads a subset.
+                    compiled = current_session.game.compiled
+            return rolling_volatility_payload(
+                compiled,
+                cadence_seconds=volatility_cadence_seconds,
+                as_of=at_ms,
+            )
+
+        server = ChartServer(html, session, metric_provider=metric_snapshot)
     except Exception:
         if server is not None:
             server.close()
@@ -188,7 +240,7 @@ def chart_area() -> None:
     game = active["game"]
     st.caption(f"{game.event_ticker} · {game.target_label}")
     st.link_button("Open chart in new tab", active["url"] + "?fullscreen=1")
-    st.iframe(active["url"], height=870)
+    st.iframe(active["url"], height=1060)
     # Streamlit's theme picker can change without a Python rerun. Relay the
     # rendered app background to the chart iframe without remounting it.
     url = json.dumps(active["url"])
@@ -280,12 +332,12 @@ def main() -> None:
             "Price line display interval (separate from volatility)", options, index=1
         )
         volatility_cadence_seconds = st.number_input(
-            "Volatility sample cadence (seconds)",
+            "Price metric sample cadence (seconds)",
             min_value=1,
             max_value=60,
             value=DEFAULT_CADENCE_SECONDS,
             step=1,
-            help="Use the last observed trade in each time bucket; empty buckets are not filled. Reload the chart to apply a change.",
+            help="Volatility and two-way movement metrics sample the last known price at this interval. Reload the chart to apply a change.",
         )
         show_fees = st.checkbox("Show maker/taker fee lines", value=True)
         refresh_seconds = (
@@ -321,7 +373,7 @@ def main() -> None:
     if active and active.get(
         "volatility_cadence_seconds", DEFAULT_CADENCE_SECONDS
     ) != int(volatility_cadence_seconds):
-        st.caption("Reload the chart to apply the new volatility cadence.")
+        st.caption("Reload the chart to apply the new price metric cadence.")
     if mode == "Kalshi API" and active and active["mode"] == mode:
         controller = active["session"]
         controller.session.refresh_seconds = int(refresh_seconds)

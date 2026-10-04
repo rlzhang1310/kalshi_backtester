@@ -14,7 +14,8 @@ python -m streamlit run fill_app.py
 
 Open the local URL printed in the terminal. The dashboard has historical
 fill estimates and CLV, No-CLV, and Oddness visualizers. To chart one game's
-odds using stored data, the Kalshi API, or a live WebSocket, run:
+odds, traded volume, and price-movement metrics using stored data, the Kalshi
+API, or a live WebSocket, run:
 
 ```powershell
 python -m streamlit run volatility_app.py
@@ -31,7 +32,9 @@ python -m pip install -r requirements.txt
 python collect_data.py
 ```
 
-Use the menu to collect Kalshi trades and market metadata, then prepare a
+Use the menu to collect Kalshi trades and market metadata; after a completed
+backfill, choose **Kalshi Global Trades Refresh** to append newer trades.
+Then prepare a
 ticker family in the fill dashboard. See [data collection](docs/data_collection.md)
 for checkpoints, local paths, and preparation steps. The data loader is
 inspired by [Jon Becker's prediction-market-analysis project](https://github.com/Jon-Becker/prediction-market-analysis).

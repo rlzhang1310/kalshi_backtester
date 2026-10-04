@@ -1,57 +1,56 @@
 # Rolling game-price volatility
 
-The [game chart UI](game_chart_ui.md) shows four rolling windows below the
-volume panel: **1m, 5m, 10m, and 30m**. Each window has accumulated realized
-volatility in percentage points and a 1-minute-equivalent value.
+The [game chart UI](game_chart_ui.md) shows volatility for **1m, 5m, 10m,
+and 30m** below the volume panel, alongside [Up, Down, and Two-way
+movement](price_movement_metrics.md).
+Each window and the all-game summary show accumulated movement in percentage
+points and a 1-minute-equivalent value. The other three displayed metrics
+are also square-rooted into percentage points and use the same time scaling.
 
-For timestamped decimal probabilities (for example, 60% is `0.60`):
+For decimal target-side probabilities (60% is `0.60`):
 
 ```text
 volatility_pp = 100 * sqrt(sum((p[i] - p[i-1]) ** 2))
-one_minute_equivalent_pp = volatility_pp / sqrt(window_minutes)
+one_minute_equivalent_pp = volatility_pp / sqrt(available_history_seconds / 60)
 ```
 
-The measure sums squared successive price changes and takes their square
-root; it does not subtract the mean or divide by observation count. The
-1-minute equivalent compares windows on a common time basis but is not a
-forecast or annualized standard deviation. Market activity can still differ
-between windows.
+The first expression does not subtract the mean or divide by observation
+count. The second puts windows on a common time basis; during warm-up it uses
+available history coverage rather than claiming the full window. Neither is
+a forecast or an annualized standard deviation.
 
-## Source and sampling
+## Shared sampled price series
 
-The helper in `src/analysis/kalshi/rolling_volatility.py` is shared by
-Historical, Kalshi API polling, and Live WebSocket chart builds. It uses the
-chart's timestamped trade-implied target probability. Historical bid/ask
-quotes are not available, so a bid/ask midpoint cannot be reconstructed.
-It takes the last **observed** trade in each fixed time bucket. Empty buckets
-are never filled and individual WebSocket messages are not assumed to be
-equally spaced. The UI's **Volatility sample cadence (seconds)** control
-selects the bucket width from 1 to 60 seconds (default 3); it is independent
-of the price-line display interval. Reload the chart to apply a new cadence.
+`src/analysis/kalshi/rolling_volatility.py` calculates all four movement
+metrics for Historical, Kalshi API polling, and Live WebSocket chart modes.
+The common source is the chart's timestamped trade-implied probability,
+expressed on the selected outcome side. Timestamped bid/ask history is not
+available, so historical bid/ask midpoints cannot be reconstructed.
 
-Each as-of sample is timestamped with the actual last trade in its bucket.
-Historical hover chooses the latest sample at or before the cursor, never
-one from the future. Live updates rebuild the values as trades arrive. A
-new ticker gets a new history; the 30-minute window needs historical trades
-spanning enough of that period.
+At each regular sample time, the last known trade price is carried forward.
+Quiet samples contribute zero change. Prices are never filled before the
+first valid trade, and historical as-of calculations ignore trades after the
+cursor. The **Price metric sample cadence (seconds)** UI setting controls the
+time grid from 1 to 60 seconds, defaulting to 3 seconds. Choose 1 for a
+1-second series; the selected value applies to all four metrics. It is separate
+from the price-line display interval. Reload the chart to apply a new
+cadence. Volume remains actual traded contracts, not carried-forward data.
 
-## Availability rules
+## Warm-up and live behavior
 
-| Window | Sample near start required within | Largest allowed observed-sample gap |
-| --- | --- | --- |
-| 1m | 10s | 30s |
-| 5m | 60s | 120s |
-| 10m | 120s | 180s |
-| 30m | 360s | 600s |
+Before the first price, the metric row says Loading. From the first sample
+onward, metrics are numeric; a window shorter than its target length is
+labeled partial with its sampled coverage. Flat observed prices yield
+`0.00 pp`, not N/A. Calculations advance with time even when no new trade
+arrives, so an old move eventually leaves its trailing window.
 
-N/A means insufficient window coverage, unsupported resolution, or a material
-gap. Recent trades alone do not make a window available: a trade must also
-cover near its start, there must be at least two bucketed observations, and
-gaps must stay within the limit. A valid flat observed window is `0.00 pp`,
-not N/A. When hovering a historical chart, a sample more than one cadence
-behind the cursor is also treated as stale. The tooltip gives the specific
-reason and formula. Sparse games may have N/A for short windows even when
-longer windows have values.
+The UI shows how long the displayed price has been carried forward and,
+separately, the feed's connected/paused/reconnecting status. Carried values
+are not new quotes. Historical hover uses the chart cursor as its as-of time
+and never uses future prices. Changing tickers resets the history. The
+shared time-sampled metric helper is queried through the local chart server's
+`/metrics` endpoint; Plotly itself does not need to redraw every second.
 
-`tests/test_rolling_volatility.py` covers known movements, flat prices,
-warm-up, gaps, ticker changes, cadence selection, and time normalization.
+`tests/test_rolling_volatility.py` checks flat prices, jumps, reversals,
+quiet periods, warm-up, cadence selection, ticker switching, and the
+square-rooted movement relationships.

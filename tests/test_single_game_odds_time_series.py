@@ -225,6 +225,26 @@ def test_live_refresh_adds_only_new_trades_and_stops_when_settled() -> None:
     assert game.trades.trade_id.tolist() == ["first", "second"]
 
 
+def test_live_game_can_wait_for_its_first_trade() -> None:
+    event = "KXNFLGAME-25SEP07CINCLE"
+    cle = make_market(f"{event}-CLE", event, "Cleveland")
+    cin = make_market(f"{event}-CIN", event, "Cincinnati")
+    cle.status = cin.status = "active"
+    client = FakeClient(live_markets={event: [cle, cin]})
+
+    game = load_game_odds(event, client=client, allow_empty=True)
+    assert game.trades.empty
+    assert game.compiled.empty
+    assert not refresh_api_game(game, client)
+
+    client.live_trades[cle.ticker] = [
+        raw_trade("first", "0.6000", "2025-09-07T17:00:00Z")
+    ]
+    assert refresh_api_game(game, client)
+    assert game.compiled.target_raw_prob.tolist() == pytest.approx([0.6])
+    assert not refresh_api_game(game, client)
+
+
 def test_live_session_only_sends_changed_snapshots() -> None:
     event = "KXNFLGAME-25SEP07CINCLE"
     cle = make_market(f"{event}-CLE", event, "Cleveland")

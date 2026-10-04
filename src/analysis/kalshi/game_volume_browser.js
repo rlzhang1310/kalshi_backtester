@@ -1,7 +1,7 @@
 (function () {
   const graph = document.getElementById('{plot_id}');
   if (!graph || !graph.on || !window.Plotly) return;
-  const index = graph.data.findIndex(trace => trace.name === 'Volume' && trace.type === 'bar');
+  let index = graph.data.findIndex(trace => trace.name === 'Volume' && trace.type === 'bar');
   if (index < 0) return;
   let source = graph.data[index].meta;
   if (!source || !source.timestamps || !source.counts) return;
@@ -29,6 +29,12 @@
 
   function rebucket() {
     pending = false;
+    const nextIndex = graph.data.findIndex(trace => trace.name === 'Volume' && trace.type === 'bar');
+    if (nextIndex < 0) return;
+    if (nextIndex !== index) {
+      index = nextIndex;
+      source = null;
+    }
     if (graph.data[index].meta !== source) {
       source = graph.data[index].meta;
       if (!source || !source.timestamps || !source.counts) return;

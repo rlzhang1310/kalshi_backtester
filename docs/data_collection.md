@@ -14,6 +14,29 @@ historical and live feeds have been read. Press `Ctrl+C` to pause; run the same
 menu option again to resume from the saved checkpoint. Completed feeds are
 skipped.
 
+After the initial global backfill finishes, choose **Kalshi Global Trades
+Refresh** from the same menu to append trades added since the last run. The
+original `checkpoint.json` and its Parquet batches remain unchanged. The
+refresh records its own state in
+`data/kalshi/trades_global_staging/refresh_checkpoint.json` and writes new
+`refresh_*.parquet` batches in that folder. It starts one week before the
+earliest original feed completion (or one week before the last successful
+refresh), fetches both live and historical feeds in a fixed UTC time range,
+and checks `trade_id` against the overlapping archive before appending.
+The overlap covers the handoff between Kalshi's live and historical tiers;
+it is not a guarantee against older gaps in the original backfill.
+
+If interrupted, choose the refresh option again. A saved cursor advances
+only after the corresponding batch reaches disk. Keep just one refresh
+process running at a time. If a process is forcibly killed and a
+`refresh.lock` file remains, verify no refresh is still running before
+removing that lock file. Do not change the original backfill's `completed`
+flags to refresh data: its finished cursors are empty, so that restarts the
+full feed. A successful refresh prints the number of pages and new trades
+for each source. Rerunning it is safe; duplicate trade IDs are not appended.
+The initial refresh may take time and temporary disk space while it checks
+IDs in the existing archive; it does not rewrite those Parquet files.
+
 Run `python collect_data.py` again and choose **Kalshi Markets** to download
 market metadata into `data/kalshi/markets/`. To prepare data for the fill
 visualizers, start `fill_app.py`, open **Run a new family or refresh existing

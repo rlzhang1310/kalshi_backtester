@@ -74,6 +74,7 @@
       revision = snapshot.revision;
       live = snapshot.live;
       refreshable = Boolean(snapshot.refreshable);
+      window.gameFeedConnection = snapshot.connection;
       if (snapshot.connection === 'authentication failed') {
         status.textContent = 'Kalshi WebSocket authentication failed';
       } else if (snapshot.connection === 'subscription failed') {
@@ -94,6 +95,7 @@
         status.textContent = 'Live · checked ' + new Date().toLocaleTimeString();
       }
     } catch (error) {
+      window.gameFeedConnection = 'refresh failed';
       status.textContent = 'Live · refresh failed; retrying';
     }
     if (live || refreshable) setTimeout(poll, interval);

@@ -18,6 +18,7 @@ details, follow the guide for the part you are changing.
 | One-game CLI, notebook, and overlays | [game_visualizer.md](game_visualizer.md) |
 | Historical/API/WebSocket chart UI | [game_chart_ui.md](game_chart_ui.md) |
 | Rolling volatility calculation | [rolling_volatility.md](rolling_volatility.md) |
+| Up, Down, and Two-way price movement | [price_movement_metrics.md](price_movement_metrics.md) |
 | Standalone live WebSocket viewer | [live_game_stream.md](live_game_stream.md) |
 
 ## Code map

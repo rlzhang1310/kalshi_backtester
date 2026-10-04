@@ -163,6 +163,31 @@ def test_game_session_subscribes_and_deduplicates_streamed_trades(monkeypatch) -
     assert session.snapshot(1)["revision"] == 1
 
 
+def test_stream_can_start_before_first_trade() -> None:
+    game = make_game()
+    game.trades = game.trades.iloc[0:0].copy()
+    game.compiled = game.compiled.iloc[0:0].copy()
+
+    class FakeClient:
+        def close(self):
+            pass
+
+    session = WebSocketGameSession(
+        game,
+        lambda current: build_game_odds_figure(
+            current.compiled, event_ticker=EVENT, target_label="Cleveland"
+        ),
+        WebSocketCredentials("key-id", ed25519.Ed25519PrivateKey.generate()),
+        client=FakeClient(),
+        initial_figure=object(),
+    )
+    record = normalize_ws_trade(trade_message(), game)
+    session._add_records([record])
+    assert game.trades.trade_id.tolist() == ["streamed"]
+    assert game.compiled.target_raw_prob.tolist() == pytest.approx([0.65])
+    assert session.snapshot(0)["revision"] == 1
+
+
 def test_reconcile_backfills_trades_missed_by_the_socket() -> None:
     game = make_game()
     credentials = WebSocketCredentials("key-id", ed25519.Ed25519PrivateKey.generate())
