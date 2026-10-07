@@ -49,6 +49,57 @@ otherwise the estimate uses all eligible archived matches.
 
 ## Data and normalization
 
+### What data the fill models load
+
+The local loading path is:
+
+```text
+data/kalshi/markets/*.parquet + data/kalshi/trades_global_staging/*.parquet
+  -> output/fill_probability/<FAMILY>/markets.parquet + trades.parquet
+  -> normalized_trades.parquet -> snapshots.parquet
+  -> dashboard estimates and CLV / No-CLV / Oddness visualizers
+```
+
+Preparation reads **all local market files** and selects event tickers with
+the exact requested family prefix followed by `-`. It scans **all local global
+trade Parquet files**, including `refresh_*.parquet`, and extracts trades whose
+market ticker has that same family prefix. It then joins trades to the selected
+market/timing tickers, repairs YES prices, deduplicates trade IDs, and sorts
+each ticker history. This is a family subset of the global archive, not a
+sample of files or a fixed list of historical dates. Other ticker families do
+not feed a selected family's model.
+
+Not every extracted print becomes a model row. A ticker needs valid scheduled
+start, actual settlement, and close times; settled/finalized status; archive
+coverage through settlement; trades before close; and a pregame trade for CLV.
+An optional maximum CLV age can exclude more tickers. The preparation audit
+records these exclusions in `ticker_audit.csv` and `ticker_summary.csv`.
+Eligible ticker histories become states on the configured normalized-time grid,
+default `0, 0.05, ..., 0.95`, only where a price has already traded and the
+market is still open. All trades before close can inform each state's current
+price or its strictly future minimum; they do not each become a separate state.
+States with no later trade remain in the data and count as misses.
+
+The dashboard and query command read the saved `snapshots.parquet`. The
+empirical estimator narrows those states to the scenario's CLV, price, and
+time tolerances. The fitted visualizers use the eligible family states to
+construct their own below-current-price bid examples; the No-CLV model omits
+CLV as an input, and Oddness uses positive cent bids and finite price inputs.
+Selecting a ticker excludes its **entire event** from the reference pool;
+an optional settlement cutoff excludes events settled on or after that time.
+The dashboard does not pool different prepared families into one model.
+
+**Cache freshness:** New files in `data/` do not change existing prepared
+outputs. Without `prepare --refresh` (or the dashboard's refresh checkbox),
+preparation reuses cached market metadata, timing metadata, and family trades.
+Refresh after collecting new trades **or** markets. Check `manifest.json` for
+the saved state's counts and archive coverage, `trade_coverage.json` for the
+source data directory, and the modification times of `trades.parquet` and
+`snapshots.parquet` against the archive files. A newer archive file means the
+cache may omit relevant trades; its timestamp alone does not prove that the
+file contains trades from this family. `coverage_end` is the latest trade time
+seen when the archive was scanned, not a live freshness check.
+
 The preparation pipeline filters **exact family membership** at the event
 and market ticker boundary. A family ending in `MATCH` does not also match
 `MATCHTOTAL` or `MATCHEXTRA`. It reads all matching markets from

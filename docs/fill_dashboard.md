@@ -15,6 +15,10 @@ bid price. Results and the bid comparison chart update automatically.
 visible progress; completed families appear in the dropdown. The ticker table
 includes excluded contracts and reasons. Selecting a ticker excludes its
 whole match from the reference data; scenario inputs remain yours to set.
+After collecting new trades or market metadata, check **Refresh cached trades
+and timing metadata** when running an existing family. Otherwise the dashboard
+continues using its saved family observations. The [loading guide](fill_probability.md#what-data-the-fill-models-load)
+explains which archive records become model data and how to check cache freshness.
 
 | Route | View | Detailed guide |
 | --- | --- | --- |

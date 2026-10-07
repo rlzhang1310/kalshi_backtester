@@ -9,6 +9,7 @@ details, follow the guide for the part you are changing.
 | Part | Documentation |
 | --- | --- |
 | Archive collection and preparation | [data_collection.md](data_collection.md) |
+| Copy-only family-partitioned trade migration | [trade_reorganization.md](trade_reorganization.md) |
 | Fill dashboard and routes | [fill_dashboard.md](fill_dashboard.md) |
 | Conditional bid-fill estimator | [fill_probability.md](fill_probability.md) |
 | CLV surface model and visualizer | [fill_surface.md](fill_surface.md) |
@@ -31,6 +32,7 @@ details, follow the guide for the part you are changing.
 | No-CLV model and UI | `src/analysis/kalshi/no_clv_fill.py`, `src/analysis/kalshi/no_clv_fill_ui.py` |
 | Odds-moneyness model and UI | `src/analysis/kalshi/odds_moneyness.py`, `src/analysis/kalshi/odds_moneyness_ui.py` |
 | Collection and calibration CLIs | `collect_data.py`, `analyze.py` |
+| Trade archive migration | `reorganize_trades.py`, `src/analysis/kalshi/trade_reorganization.py` |
 | Game CLI / notebook | `visualize_game.py`, `single_game_odds_time_series_visualizer.ipynb` |
 | Game data, rendering, overlays | `src/analysis/kalshi/local_game_data.py`, `src/analysis/kalshi/single_game_odds_time_series.py`, `src/analysis/kalshi/game_overlays.py` |
 | Game chart UI and server | `volatility_app.py`, `src/analysis/kalshi/chart_server.py` |

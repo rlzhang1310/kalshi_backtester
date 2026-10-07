@@ -43,9 +43,26 @@ visualizers, start `fill_app.py`, open **Run a new family or refresh existing
 data**, choose a sports ticker family, and click **Run family**. Prepared family
 outputs live under `output/fill_probability/` and can be reused on later runs.
 
+Collecting or refreshing global trades only changes files in `data/`; it does
+not update an already prepared fill family. After collecting more trades or
+markets, run that family's preparation again with **Refresh cached trades and
+timing metadata** checked (or use `python estimate_fill.py prepare --family
+FAMILY --refresh`). This rescans the current local market and global trade
+Parquet files, fetches timing metadata again, and rebuilds the family's saved
+observations. Without this option, preparation reuses its cached market list,
+trade extract, and timing metadata even when new archive files exist. Each fill
+dashboard page reads the saved observations, not the global trade files directly.
+See [fill_probability.md](fill_probability.md#what-data-the-fill-models-load)
+for the full inclusion rules and a cache freshness check.
+
 The game chart UI's Kalshi API mode does not import trades into this local
 archive. A game may be listed in the local market catalog but lack collected
 trades; use API mode if Kalshi still serves its history. See
 [game_visualizer.md](game_visualizer.md) for bounded local scans and catalog
 behavior, and [fill_probability.md](fill_probability.md) for family preparation
 and the estimator's data requirements.
+
+For a separate, copy-only organization of a captured global-trade snapshot
+into family partitions, see [trade_reorganization.md](trade_reorganization.md).
+It does not change the collector, current readers, or prepared fill data, and
+new refresh batches do not automatically enter that organized snapshot.
