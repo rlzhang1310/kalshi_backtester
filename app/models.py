@@ -103,3 +103,48 @@ class PairedOrderRequest(BaseModel):
                               ticker=second_ticker, outcome=second_outcome,
                               price=self.second_price, mode=self.mode)
         return first, second
+
+
+class PaperConfigureRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    primary_ticker: str
+    primary_outcome: Literal["yes", "no"]
+    other_ticker: str
+    other_outcome: Literal["yes", "no"]
+    relationship: Literal["same_outcome", "opposite_outcomes"]
+    quantity: str = "1"
+    min_profit: str = "0"
+    safety_margin: str = "0"
+    direct_account: bool = False
+    settlement_asserted: bool = False
+    delays_ms: list[int] = [0, 25, 50, 100]
+
+    @field_validator("primary_ticker", "other_ticker")
+    @classmethod
+    def validate_market(cls, value: str) -> str:
+        return ticker(value)
+
+    @field_validator("quantity")
+    @classmethod
+    def validate_quantity(cls, value: str) -> str:
+        number = decimal(value)
+        if number <= 0 or number > 100 or number.as_tuple().exponent < -2:
+            raise ValueError("Quantity must be 0.01 to 100 contracts")
+        return canonical(number)
+
+    @field_validator("min_profit", "safety_margin")
+    @classmethod
+    def validate_threshold(cls, value: str) -> str:
+        number = decimal(value)
+        if number < 0 or number > 100 or number.as_tuple().exponent < -4:
+            raise ValueError("Threshold must be a nonnegative dollar amount with up to four decimals")
+        return canonical(number)
+
+    @field_validator("delays_ms")
+    @classmethod
+    def validate_delays(cls, values: list[int]) -> list[int]:
+        if not values or len(values) > 8 or len(set(values)) != len(values) or 0 not in values or any(
+            isinstance(value, bool) or value < 0 or value > 5000 for value in values
+        ):
+            raise ValueError("Choose unique delays from 0 to 5000 ms, including zero")
+        return sorted(values)

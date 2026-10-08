@@ -33,14 +33,17 @@ details, follow the guide for the part you are changing.
 | Odds-moneyness model and UI | `src/analysis/kalshi/odds_moneyness.py`, `src/analysis/kalshi/odds_moneyness_ui.py` |
 | Collection and calibration CLIs | `collect_data.py`, `analyze.py` |
 | Trade archive migration | `reorganize_trades.py`, `src/analysis/kalshi/trade_reorganization.py` |
+| Published trade readers and scoped updates | `src/analysis/kalshi/util/trades.py`, `src/indexers/kalshi/scoped_trades.py` |
 | Game CLI / notebook | `visualize_game.py`, `single_game_odds_time_series_visualizer.ipynb` |
 | Game data, rendering, overlays | `src/analysis/kalshi/local_game_data.py`, `src/analysis/kalshi/single_game_odds_time_series.py`, `src/analysis/kalshi/game_overlays.py` |
 | Game chart UI and server | `volatility_app.py`, `src/analysis/kalshi/chart_server.py` |
 | Live game sessions | `src/analysis/kalshi/live_game_stream.py`, `src/analysis/kalshi/toggleable_polling.py`, `live_game.py` |
 | Rolling volatility | `src/analysis/kalshi/rolling_volatility.py`, `src/analysis/kalshi/game_volatility_browser.js` |
 
-Local archives live under `data/`; generated datasets and charts live under
-`output/`. Do not commit credentials from `.env`.
+The mixed trade archive is the collector/migration input. Historical Kalshi
+readers use verified `data/kalshi/trades_by_series/` partitions, with scoped
+updates appended there. Generated datasets and charts live under `output/`.
+Do not commit credentials from `.env`.
 
 ## Data and modeling conventions
 
@@ -57,8 +60,9 @@ Local archives live under `data/`; generated datasets and charts live under
 - The surface learns the bid-zero value from data by default. Its optional
   legacy boundary is a visualization-only assumption. Preserve empirical
   zeros and missing data; never inject synthetic trades.
-- Use bounded archive scans and cached family outputs; do not load the entire
-  global trade archive into memory. Ignore `._` resource-fork files.
+- Select the family partition before reading game or fill trades. Sport
+  calibration selects its relevant families; whole-market statistics may read
+  all published partitions. Do not union the snapshot with raw staging.
 - Discover prepared families from manifests plus `snapshots.parquet` under
   `output/fill_probability/`. Read current counts/coverage from manifests;
   do not assume every supported sport has been prepared.

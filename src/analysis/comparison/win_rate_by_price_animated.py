@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.animation import FuncAnimation
 
+from src.analysis.kalshi.util.trades import create_organized_trades_view
 from src.common.analysis import Analysis, AnalysisOutput
 
 # Bucket size for block-to-timestamp approximation (10800 blocks ~ 6 hours at 2 sec/block)
@@ -47,7 +48,7 @@ class WinRateByPriceAnimatedAnalysis(Analysis):
         base_dir = Path(__file__).parent.parent.parent.parent
 
         # Kalshi paths
-        self.kalshi_trades_dir = Path(kalshi_trades_dir or base_dir / "data" / "kalshi" / "trades")
+        self.kalshi_trades_dir = Path(kalshi_trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
         self.kalshi_markets_dir = Path(kalshi_markets_dir or base_dir / "data" / "kalshi" / "markets")
 
         # Polymarket paths
@@ -230,6 +231,7 @@ class WinRateByPriceAnimatedAnalysis(Analysis):
     def _load_kalshi_aggregates(self) -> pd.DataFrame:
         """Load Kalshi trades pre-aggregated by week and price."""
         con = duckdb.connect()
+        create_organized_trades_view(con, self.kalshi_trades_dir)
 
         df = con.execute(
             f"""
@@ -245,7 +247,7 @@ class WinRateByPriceAnimatedAnalysis(Analysis):
                     DATE_TRUNC('day', t.created_time) AS week,
                     CASE WHEN t.taker_side = 'yes' THEN t.yes_price ELSE t.no_price END AS price,
                     CASE WHEN t.taker_side = m.result THEN 1 ELSE 0 END AS won
-                FROM '{self.kalshi_trades_dir}/*.parquet' t
+                FROM analysis_trades t
                 INNER JOIN resolved_markets m ON t.ticker = m.ticker
 
                 UNION ALL
@@ -255,7 +257,7 @@ class WinRateByPriceAnimatedAnalysis(Analysis):
                     DATE_TRUNC('day', t.created_time) AS week,
                     CASE WHEN t.taker_side = 'yes' THEN t.no_price ELSE t.yes_price END AS price,
                     CASE WHEN t.taker_side != m.result THEN 1 ELSE 0 END AS won
-                FROM '{self.kalshi_trades_dir}/*.parquet' t
+                FROM analysis_trades t
                 INNER JOIN resolved_markets m ON t.ticker = m.ticker
             )
             SELECT week, price, COUNT(*) AS total, SUM(won) AS wins

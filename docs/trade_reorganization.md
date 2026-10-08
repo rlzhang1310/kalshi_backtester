@@ -2,10 +2,10 @@
 
 `reorganize_trades.py` builds a **copy** of one frozen local Kalshi global-trade
 archive snapshot, partitioned by ticker family. It reads existing local Parquet
-files only; it makes no Kalshi API requests. The original files, the collector's
-`checkpoint.json` and `refresh_checkpoint.json`, current game charts, fill
-visualizers, and prepared `output/fill_probability/` caches stay in use as
-before. Stop the original collector and refresh process before starting a run.
+files only; it makes no Kalshi API requests. The original files and collector
+checkpoints remain untouched. Local game charts, Kalshi analyses, and fill
+preparation require the verified published output; API-based live charts remain
+independent. Stop the original collector and refresh process before starting a run.
 
 ## Why the files must be rewritten
 
@@ -13,8 +13,9 @@ Each source file in `data/kalshi/trades_global_staging/` can hold trades from
 multiple families. Renaming a file cannot make it a family partition. The tool
 reads all captured `*.parquet` files, including completed `refresh_*.parquet`
 files, and writes family-specific data files. It preserves duplicate trade IDs
-and duplicate rows. Later archive refreshes do **not** update this published
-snapshot; creating an incremental updater is future work.
+and duplicate rows. Later global-archive refreshes do **not** update this
+published snapshot. After publication and verification, the selected-scope
+`collect_data.py trades` command can append family-specific trades directly.
 
 The default output is `data/kalshi/trades_by_series/series_ticker=<FAMILY>/part-*.parquet`,
 plus `_metadata/dataset.json`, `family_catalog.parquet`, `validation.json`, and
@@ -117,7 +118,56 @@ unresolved row counts and validation results. A test fixture compares the
 entire source and output as an exact row multiset.
 
 The full production migration is a separate, potentially long operational
-run; implementing this tool does not start it. Future phases can point readers
-at the new partitions, build incremental publication, and consider retirement
-of the old archive only after those readers and the collector's refresh
-deduplication no longer depend on it.
+run; implementing this tool does not start it. The scoped updater refuses an
+absent or unverified published destination. Finish the existing `RUN_ID` with
+`resume` and `verify` before starting scoped updates; do not launch another
+`run` against its destination. As of October 7, 2026, this workspace's family
+dataset had **not** been published: the existing migration manifest was still
+running. No production backfill is implied by the scoped updater code.
+
+## Appended scoped trades
+
+After the copy-only snapshot is published, `python collect_data.py trades
+--family KXNFLGAME --since 2026-09-01T00:00:00Z` establishes an explicit
+checked range. Use `--ticker FULL_MARKET_TICKER` to ingest exactly one market.
+Routine runs omit `--since`; bounded repairs use both `--since` and `--until`.
+See [data_collection.md](data_collection.md#selected-family-or-market-trade-updates)
+for full commands and recovery behavior.
+
+The updater puts immutable `scoped_*.parquet` batches beside that family's
+`part-*.parquet`, with exactly the published schema. A temporary file is
+renamed into place before the cursor/checkpoint moves. On rerun, a published
+batch missing from the checkpoint is recovered and its IDs deduplicated. The
+single `_metadata/scoped_checkpoint.json` tracks discovery, per-market checked
+ranges, in-progress endpoints/cursors, and appended files. The OS lock is
+shared by all scoped selections, so a family and one of its markets cannot
+write concurrently. Source `dataset.json`, `family_catalog.parquet`, and
+`validation.json` remain provenance for the original snapshot only; they do
+not certify appended rows or assert complete Kalshi history. A copied row's
+timestamp is not a coverage boundary. The first adoption therefore requires
+an explicit start when none is known.
+
+The shared reader in `src/analysis/kalshi/util/trades.py` includes base and
+scoped files and validates the published metadata. Single-game and fill paths
+open one family partition. Sport calibration opens only the families selected
+by its market filter; all-market analyses scan all published partitions. It
+never unions the raw staging archive with its copied snapshot and does not
+remove duplicate rows already present in the base. Physical files are each
+sorted, but the family as a whole has no guaranteed order; SQL callers should
+specify `ORDER BY`. Fill preparation detects new files and successful empty
+checked windows in the scoped checkpoint. Markets without sufficient checked
+ranges remain in its audit as incomplete. Retire the old archive only after
+the global collector and migration no longer depend on it.
+
+| Consumer | Trade files read |
+| --- | --- |
+| Local game chart and notebook | Selected event's family partition, then exact market/time filters |
+| Fill preparation and dashboard cache build | Selected family partition; prepared observations remain under `output/fill_probability/` |
+| Sport/category calibration | Families present in the selected finalized markets |
+| All-market Kalshi and Kalshi/Polymarket analyses | All published family partitions |
+| Trade inspection script | Required `--family` or full `--ticker` selection |
+
+Market metadata remains under `data/kalshi/markets/`; the family migration
+organizes trades, not market records. Kalshi API and WebSocket live modes still
+read the exchange directly. The older `data/kalshi/trades/` per-ticker collector
+output and mixed global staging files are not read by these historical analyses.

@@ -8,6 +8,7 @@ import duckdb
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from src.analysis.kalshi.util.trades import create_organized_trades_view
 from src.common.analysis import Analysis, AnalysisOutput
 from src.common.interfaces.chart import ChartConfig, ChartType, ScaleType, UnitType
 
@@ -24,18 +25,19 @@ class VolumeOverTimeAnalysis(Analysis):
             description="Quarterly notional volume analysis for Kalshi",
         )
         base_dir = Path(__file__).parent.parent.parent.parent
-        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades")
+        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
 
     def run(self) -> AnalysisOutput:
         """Execute the analysis and return outputs."""
         con = duckdb.connect()
+        create_organized_trades_view(con, self.trades_dir)
 
         df = con.execute(
-            f"""
+            """
             SELECT
                 DATE_TRUNC('quarter', created_time) AS quarter,
                 SUM(count) AS volume_usd
-            FROM '{self.trades_dir}/*.parquet'
+            FROM analysis_trades
             GROUP BY quarter
             ORDER BY quarter
             """

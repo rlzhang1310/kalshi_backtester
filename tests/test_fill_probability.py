@@ -279,23 +279,40 @@ def test_metadata_uses_real_settlement_and_prefers_primary_milestone():
 def test_offline_prepare_and_query_end_to_end(tmp_path, monkeypatch):
     root = tmp_path / "data"
     (root / "kalshi" / "markets").mkdir(parents=True)
-    (root / "kalshi" / "trades_global_staging").mkdir()
+    dataset_dir = root / "kalshi" / "trades_by_series"
+    family_dir = dataset_dir / f"series_ticker={FAMILY}"
+    family_dir.mkdir(parents=True)
+    metadata_dir = dataset_dir / "_metadata"
+    metadata_dir.mkdir()
+    (metadata_dir / "dataset.json").write_text(json.dumps({
+        "run_id": "fixture", "validation_status": "passed",
+        "partition_key": "series_ticker",
+    }))
+    pd.DataFrame({"family": [FAMILY], "row_count": [6]}).to_parquet(
+        metadata_dir / "family_catalog.parquet", index=False
+    )
+    (metadata_dir / "scoped_checkpoint.json").write_text(json.dumps({
+        "base_run_id": "fixture",
+        "markets": {TICKER: {"family": FAMILY, "coverage": [[
+            int((START - pd.Timedelta(hours=1)).timestamp()),
+            int((START + pd.Timedelta(hours=1)).timestamp()),
+        ]]}},
+    }))
     timings()[["ticker", "event_ticker"]].to_parquet(
         root / "kalshi" / "markets" / "markets_0_10000.parquet"
     )
     frame = trades()
-    # Establish global coverage beyond settlement with an unrelated market.
+    # A later print in this family establishes the observed family horizon.
     unrelated = frame.iloc[[-1]].assign(
-        ticker="OTHER-EVENT-A",
+        ticker=EVENT + "-B",
         trade_id="other",
         created_time=START + pd.Timedelta(hours=1),
     )
-    pd.concat([frame, unrelated]).to_parquet(
-        root / "kalshi" / "trades_global_staging" / "historical_0.parquet"
-    )
-    frame.iloc[[1]].to_parquet(
-        root / "kalshi" / "trades_global_staging" / "live_0.parquet"
-    )
+    pd.concat([frame, unrelated]).to_parquet(family_dir / "part-0.parquet")
+    frame.iloc[[1]].to_parquet(family_dir / "scoped_0.parquet")
+    other_family = dataset_dir / "series_ticker=KXOTHER"
+    other_family.mkdir()
+    unrelated.assign(ticker="KXOTHER-EVENT-A", trade_id="other-family").to_parquet(other_family / "part-0.parquet")
     timing_file = tmp_path / "times.csv"
     timings().to_csv(timing_file, index=False)
     output = tmp_path / "output"
@@ -358,6 +375,28 @@ def test_offline_prepare_and_query_end_to_end(tmp_path, monkeypatch):
     )
     assert (folder / "normalized_trades.parquet").stat().st_mtime_ns == modified
     assert len(pd.read_parquet(folder / "snapshots.parquet")) == 2
+
+    # Coverage changes without a Parquet change still invalidate preparation.
+    checkpoint_path = dataset_dir / "_metadata" / "scoped_checkpoint.json"
+    checkpoint = json.loads(checkpoint_path.read_text())
+    checkpoint["markets"][TICKER]["coverage"] = []
+    checkpoint_path.write_text(json.dumps(checkpoint))
+    prepare_fill_data(
+        family=FAMILY, data_dir=root, output_dir=output,
+        timings_path=timing_file, time_step=0.25, progress=lambda _: None,
+    )
+    assert pd.read_csv(folder / "ticker_audit.csv").status.tolist() == ["incomplete_trade_horizon"]
+    assert json.loads((folder / "manifest.json").read_text())["n_snapshots"] == 0
+    checkpoint["markets"][TICKER]["coverage"] = [[
+        int((START - pd.Timedelta(hours=1)).timestamp()),
+        int((START + pd.Timedelta(hours=2)).timestamp()),
+    ]]
+    checkpoint_path.write_text(json.dumps(checkpoint))
+    prepare_fill_data(
+        family=FAMILY, data_dir=root, output_dir=output,
+        timings_path=timing_file, time_step=0.25, progress=lambda _: None,
+    )
+    assert json.loads((folder / "manifest.json").read_text())["n_snapshots"] == 4
 
 
 def test_streaming_keeps_tickers_whole_across_batch_boundaries(tmp_path):

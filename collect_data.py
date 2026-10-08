@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 from src.common.indexer import Indexer
 from src.common.util.strings import snake_to_title
 
@@ -56,4 +58,9 @@ def __main__():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        if sys.argv[1] != "trades":
+            raise SystemExit("Use 'python collect_data.py trades --family FAMILY' or --ticker FULL_MARKET_TICKER")
+        from src.indexers.kalshi.scoped_trades import main as scoped_trades_main
+        raise SystemExit(scoped_trades_main(sys.argv[2:]))
     __main__()

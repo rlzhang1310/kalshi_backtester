@@ -21,7 +21,6 @@ class WinRateByPriceTennisAnalysis(Analysis):
     def __init__(
         self,
         trades_dir: Path | str | None = None,
-        global_trades_dir: Path | str | None = None,
         markets_dir: Path | str | None = None,
     ):
         super().__init__(
@@ -29,14 +28,12 @@ class WinRateByPriceTennisAnalysis(Analysis):
             description="Win rate vs price market calibration analysis for tennis markets",
         )
         base_dir = Path(__file__).parent.parent.parent.parent
-        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades")
-        self.global_trades_dir = Path(global_trades_dir or base_dir / "data" / "kalshi" / "trades_global_staging")
+        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
         self.markets_dir = Path(markets_dir or base_dir / "data" / "kalshi" / "markets")
 
     def run(self) -> AnalysisOutput:
         """Execute the analysis and return outputs."""
         con = duckdb.connect()
-        create_combined_trades_view(con, self.trades_dir, self.global_trades_dir)
 
         markets_df = con.execute(
             f"""
@@ -62,6 +59,9 @@ class WinRateByPriceTennisAnalysis(Analysis):
             fig = self._create_figure(df)
             chart = self._create_chart(df)
             return AnalysisOutput(figure=fig, data=df, chart=chart)
+
+        families = markets_df.loc[markets_df["is_tennis"], "event_ticker"].str.split("-").str[0].unique()
+        create_combined_trades_view(con, self.trades_dir, families=families)
 
         ticker_sql = ", ".join(f"'{ticker.replace(chr(39), chr(39) * 2)}'" for ticker in tennis_tickers)
 

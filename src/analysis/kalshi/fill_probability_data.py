@@ -23,10 +23,9 @@ from src.analysis.kalshi.fill_probability import (
 )
 from src.analysis.kalshi.local_game_data import (
     DEFAULT_DATA_DIR,
-    FILE_BATCH_SIZE,
     LocalGameStore,
-    _files,
 )
+from src.analysis.kalshi.util.trades import family_trade_files
 from src.indexers.kalshi.client import KalshiClient
 
 
@@ -43,6 +42,42 @@ def _pages(client, endpoint: str, key: str, params: dict):
             raise ValueError(f"Repeated pagination cursor from {endpoint}.")
         seen.add(cursor)
         params["cursor"] = cursor
+
+
+def _scoped_coverage(dataset: Path, family: str) -> dict[str, list[list[int]]]:
+    checkpoint = dataset / "_metadata" / "scoped_checkpoint.json"
+    if not checkpoint.is_file():
+        return {}
+    state = json.loads(checkpoint.read_text(encoding="utf8"))
+    published = json.loads((dataset / "_metadata" / "dataset.json").read_text(encoding="utf8"))
+    if state.get("base_run_id") != published.get("run_id"):
+        raise ValueError("Scoped trade checkpoint does not match the published dataset")
+    return {
+        ticker: entry.get("coverage", [])
+        for ticker, entry in state.get("markets", {}).items()
+        if entry.get("family") == family
+    }
+
+
+def _file_signature(files: list[Path]) -> str:
+    snapshot = [(path.name, path.stat().st_size, path.stat().st_mtime_ns) for path in files]
+    return hashlib.sha256(json.dumps(snapshot).encode()).hexdigest()
+
+
+def _coverage_signature(coverage: dict) -> str:
+    return hashlib.sha256(json.dumps(sorted(coverage.items())).encode()).hexdigest()
+
+
+def _proven_through(
+    ticker: str, earliest: pd.Timestamp, settlement: pd.Timestamp, coverage: dict
+) -> pd.Timestamp:
+    if pd.isna(earliest) or pd.isna(settlement):
+        return pd.Timestamp("1970-01-01T00:00:00Z")
+    required_start = earliest.timestamp()
+    required_end = settlement.timestamp()
+    ends = [end for start, end in coverage.get(ticker, [])
+            if start <= required_start and end >= required_end]
+    return pd.Timestamp(max(ends), unit="s", tz="UTC") if ends else pd.Timestamp("1970-01-01T00:00:00Z")
 
 
 def fetch_family_timings(
@@ -142,54 +177,37 @@ def extract_family_trades(
     output_path: Path,
     progress: Callable[[str], None] = print,
 ) -> pd.Timestamp:
-    """Scan the archive once for an entire family rather than once per ticker."""
+    """Stream one published family partition to the preparation cache."""
     family = normalize_family(family)
-    files = _files(Path(data_dir) / "kalshi" / "trades_global_staging")
+    dataset = Path(data_dir) / "kalshi" / "trades_by_series"
+    files = family_trade_files(dataset, family)
     if not files:
-        raise ValueError("No local trade Parquet files found.")
-    coverage_end = pd.NaT
+        raise ValueError(f"No stored trades found for {family} in the published dataset.")
     pending = output_path.with_suffix(".inprogress.parquet")
-    writer = None
-    try:
-        with duckdb.connect() as con:
-            con.execute("SET enable_progress_bar=false")
-            con.execute("SET memory_limit='2GB'")
-            for offset in range(0, len(files), FILE_BATCH_SIZE):
-                batch = files[offset : offset + FILE_BATCH_SIZE]
-                # Global archive coverage, not just the last print of this family.
-                latest = con.execute(
-                    "SELECT max(created_time) FROM read_parquet(?, union_by_name=true)",
-                    [batch],
-                ).fetchone()[0]
-                if latest is not None:
-                    timestamp = utc(latest)
-                    if pd.isna(coverage_end) or timestamp > coverage_end:
-                        coverage_end = timestamp
-                frame = con.execute(
-                    "SELECT trade_id, ticker, count, yes_price, no_price, taker_side, created_time "
-                    "FROM read_parquet(?, union_by_name=true) WHERE starts_with(ticker, ?)",
-                    [batch, family + "-"],
-                ).fetchdf()
-                if not frame.empty:
-                    table = pa.Table.from_pandas(frame, preserve_index=False)
-                    if writer is None:
-                        writer = pq.ParquetWriter(
-                            pending, table.schema, compression="zstd"
-                        )
-                    writer.write_table(table)
-                if offset % (
-                    FILE_BATCH_SIZE * 10
-                ) == 0 or offset + FILE_BATCH_SIZE >= len(files):
-                    progress(
-                        f"Trade files scanned: {min(offset + FILE_BATCH_SIZE, len(files)):,}/{len(files):,}"
-                    )
-    finally:
-        if writer is not None:
-            writer.close()
-    if writer is None:
-        raise ValueError(f"No stored trades found for {family}.")
-    pending.replace(output_path)
-    return coverage_end
+    pending.unlink(missing_ok=True)
+    progress(f"Reading {len(files):,} published {family} trade files...")
+    with duckdb.connect() as con:
+        con.execute("SET enable_progress_bar=false")
+        con.execute("SET memory_limit='2GB'")
+        con.execute("SET preserve_insertion_order=false")
+        latest = con.execute(
+            "SELECT max(created_time) FROM read_parquet(?, union_by_name=true) WHERE starts_with(ticker, ?)",
+            [[str(path) for path in files], family + "-"],
+        ).fetchone()[0]
+        if latest is None:
+            raise ValueError(f"No stored trades found for {family}.")
+        escaped = str(pending).replace("'", "''")
+        try:
+            con.execute(
+                f"COPY (SELECT trade_id,ticker,count,yes_price,no_price,taker_side,created_time "
+                f"FROM read_parquet(?, union_by_name=true) WHERE starts_with(ticker, ?)) "
+                f"TO '{escaped}' (FORMAT PARQUET, COMPRESSION ZSTD)",
+                [[str(path) for path in files], family + "-"],
+            )
+            pending.replace(output_path)
+        finally:
+            pending.unlink(missing_ok=True)
+    return utc(latest)
 
 
 TRADE_COLUMNS = [
@@ -295,20 +313,31 @@ def build_cached_dataset(
     timings: pd.DataFrame,
     *,
     family: str,
-    coverage_end,
+    coverage_ranges: dict[str, list[list[int]]],
     time_step: float,
     max_clv_age_minutes,
     progress,
 ) -> FillDataset:
     metadata = timings.set_index("ticker", drop=False)
     snapshots, audits, seen = [], [], set()
+    coverage_ends = {
+        row.ticker: _proven_through(row.ticker, row.start_time, row.settlement_time, coverage_ranges)
+        for row in timings.itertuples(index=False)
+    }
     options = dict(
         family=family,
-        coverage_end=coverage_end,
+        coverage_end=coverage_ends,
         time_step=time_step,
         max_clv_age_minutes=max_clv_age_minutes,
     )
     for ticker, trades in _ticker_frames(normalized_path):
+        if ticker in coverage_ends and not trades.empty:
+            row = metadata.loc[ticker]
+            first_trade = utc(trades.created_time).min()
+            earliest = min(first_trade, row.start_time) if pd.notna(row.start_time) else first_trade
+            coverage_ends[ticker] = _proven_through(
+                ticker, earliest, row.settlement_time, coverage_ranges
+            )
         result = build_fill_dataset(
             trades, metadata.loc[[ticker]].reset_index(drop=True), **options
         )
@@ -343,12 +372,23 @@ def prepare_fill_data(
 ) -> Path:
     """Prepare every stored ticker in the family; cache expensive inputs explicitly.
 
-    Repeated builds reuse cached trade and API snapshots. --refresh performs
-    a fresh archive scan and metadata fetch after collecting new data.
+    Repeated builds reuse cached inputs while the family partition is unchanged.
+    A changed family partition or --refresh rebuilds the prepared observations.
     """
     family = normalize_family(family)
+    dataset = Path(data_dir) / "kalshi" / "trades_by_series"
+    source_files = family_trade_files(dataset, family)
+    if not source_files:
+        raise ValueError(f"No published trades for {family}; finish migration or ingest that family first.")
+    coverage_ranges = _scoped_coverage(dataset, family)
+    files_signature = _file_signature(source_files)
+    coverage_signature = _coverage_signature(coverage_ranges)
     folder = Path(output_dir) / family
     folder.mkdir(parents=True, exist_ok=True)
+    coverage_path = folder / "trade_coverage.json"
+    cached_coverage = json.loads(coverage_path.read_text()) if coverage_path.exists() else {}
+    if cached_coverage.get("files_signature") != files_signature:
+        refresh = True
     markets_path = folder / "markets.parquet"
     if markets_path.exists() and not refresh:
         markets = pd.read_parquet(markets_path)
@@ -387,10 +427,7 @@ def prepare_fill_data(
         timings = fetch_family_timings(markets, family=family, progress=progress)
         timings.to_parquet(timing_cache, index=False)
 
-    trade_cache, coverage_path = (
-        folder / "trades.parquet",
-        folder / "trade_coverage.json",
-    )
+    trade_cache = folder / "trades.parquet"
     if trade_cache.exists() and coverage_path.exists() and not refresh:
         progress(
             "Using cached family trades. Run with --refresh after updating the archive."
@@ -405,15 +442,8 @@ def prepare_fill_data(
         coverage_end = extract_family_trades(
             data_dir, family=family, output_path=trade_cache, progress=progress
         )
-        coverage_path.write_text(
-            json.dumps(
-                {
-                    "coverage_end": coverage_end.isoformat(),
-                    "data_dir": str(Path(data_dir).resolve()),
-                },
-                indent=2,
-            )
-        )
+        if _file_signature(family_trade_files(dataset, family)) != files_signature:
+            raise RuntimeError("Family trade files changed during preparation; rerun to use one snapshot.")
     n_prints = pq.ParquetFile(trade_cache).metadata.num_rows
     progress(
         f"Normalizing {n_prints:,} prints across {len(timings):,} tickers (bounded memory)..."
@@ -425,11 +455,14 @@ def prepare_fill_data(
         normalized_path,
         timings,
         family=family,
-        coverage_end=coverage_end,
+        coverage_ranges=coverage_ranges,
         time_step=time_step,
         max_clv_age_minutes=max_clv_age_minutes,
         progress=progress,
     )
+    if (_file_signature(family_trade_files(dataset, family)) != files_signature
+            or _coverage_signature(_scoped_coverage(dataset, family)) != coverage_signature):
+        raise RuntimeError("Family trades or checked ranges changed during preparation; rerun.")
     result.snapshots.to_parquet(folder / "snapshots.parquet", index=False)
     result.audit.to_csv(folder / "ticker_audit.csv", index=False)
     summary = result.audit.merge(
@@ -445,6 +478,13 @@ def prepare_fill_data(
         validate="one_to_one",
     )
     summary.to_csv(folder / "ticker_summary.csv", index=False)
+    coverage_path.write_text(json.dumps({
+        "coverage_end": coverage_end.isoformat(),
+        "data_dir": str(Path(data_dir).resolve()),
+        "source": "published_family_dataset",
+        "files_signature": files_signature,
+        "coverage_signature": coverage_signature,
+    }, indent=2))
     manifest = {
         "family": family,
         "time_step": time_step,
@@ -464,7 +504,7 @@ def prepare_fill_data(
         "limitations": [
             "Retrospective settlement clock",
             "No queue position or order-size simulation",
-            "Archive completeness assumed within coverage",
+            "Only individually checked market intervals covering the observed history and settlement are eligible",
             "Legacy archive has no block-trade flag",
         ],
     }

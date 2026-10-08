@@ -12,6 +12,12 @@ every finalized YES/NO market for that sport, including mixed and unclassified
 event families. Non-player game props such as both-teams-to-score and
 exact-score markets are grouped under Team Props.
 
+Trade inputs come from the verified published
+`data/kalshi/trades_by_series/` dataset, including scoped `scoped_*.parquet`
+appends. The selected sport/category identifies family partitions before the
+trade read; an unfiltered run reads all published families. An unfinished
+migration causes an actionable error instead of a scan of the mixed archive.
+
 Prompts can be skipped for repeatable runs:
 
 ```powershell

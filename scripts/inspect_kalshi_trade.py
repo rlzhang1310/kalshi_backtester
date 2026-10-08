@@ -1,10 +1,8 @@
 """Print the schema and a few records from the stored Kalshi trade feed.
 
 Examples:
-    python scripts/inspect_kalshi_trade.py
-    python scripts/inspect_kalshi_trade.py --limit 10
-    python scripts/inspect_kalshi_trade.py --ticker KXNBAGAME-...
-    python scripts/inspect_kalshi_trade.py --path "data/kalshi/trades/*.parquet"
+    python scripts/inspect_kalshi_trade.py --family KXNFLGAME
+    python scripts/inspect_kalshi_trade.py --ticker KXNFLGAME-... --limit 10
 """
 
 from __future__ import annotations
@@ -12,11 +10,17 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 
 import duckdb
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-DEFAULT_PATH = "data/kalshi/trades_global_staging/*.parquet"
+from src.analysis.kalshi.util.trades import family_trade_files
+
+
+DEFAULT_DATASET = Path("data/kalshi/trades_by_series")
 
 
 def sql_literal(value: str) -> str:
@@ -28,12 +32,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Show what records in the stored Kalshi trade feed look like."
     )
-    parser.add_argument(
-        "--path",
-        default=DEFAULT_PATH,
-        help=f"Parquet file or glob to inspect (default: {DEFAULT_PATH})",
-    )
-    parser.add_argument("--ticker", help="Only show trades for this exact ticker")
+    parser.add_argument("--dataset-dir", type=Path, default=DEFAULT_DATASET)
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--family", help="One ticker family")
+    selection.add_argument("--ticker", help="One full market ticker")
     parser.add_argument("--limit", type=int, default=5, help="Rows to print (default: 5)")
     return parser.parse_args()
 
@@ -42,9 +44,18 @@ def main() -> None:
     args = parse_args()
     if args.limit < 1:
         raise SystemExit("--limit must be at least 1")
+    if args.ticker:
+        args.ticker = args.ticker.strip().upper()
+        if "-" not in args.ticker:
+            raise SystemExit("--ticker requires a full market ticker; use --family for a series")
 
-    parquet_path = Path(args.path).as_posix()
-    source = f"read_parquet('{sql_literal(parquet_path)}')"
+    family = args.family or args.ticker.split("-", 1)[0]
+    files = family_trade_files(args.dataset_dir, family)
+    if not files:
+        raise SystemExit(f"No published trades for {family}")
+    parquet_path = str(args.dataset_dir / family)
+    paths = ", ".join(f"'{sql_literal(str(path))}'" for path in files)
+    source = f"read_parquet([{paths}], union_by_name=true, hive_partitioning=false)"
     where = ""
     parameters: list[str] = []
     if args.ticker:

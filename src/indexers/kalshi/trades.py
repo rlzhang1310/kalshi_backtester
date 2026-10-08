@@ -29,7 +29,7 @@ class KalshiTradesIndexer(Indexer):
     ):
         super().__init__(
             name="kalshi_trades",
-            description="Backfills Kalshi trades data to parquet files",
+            description="Legacy ticker backfill to data/kalshi/trades (not used by published family readers)",
         )
         self._min_ts = min_ts
         self._max_ts = max_ts

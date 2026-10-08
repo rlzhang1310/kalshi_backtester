@@ -7,6 +7,7 @@ Actual settlement is used to normalize time, so the clock is retrospective.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Mapping
 from decimal import Decimal
 import re
 
@@ -127,7 +128,7 @@ def build_fill_dataset(
     timings: pd.DataFrame,
     *,
     family: str,
-    coverage_end: str | pd.Timestamp,
+    coverage_end: str | pd.Timestamp | Mapping[str, pd.Timestamp],
     time_step: float = 0.05,
     max_clv_age_minutes: float | None = None,
 ) -> FillDataset:
@@ -143,17 +144,22 @@ def build_fill_dataset(
         not np.isfinite(max_clv_age_minutes) or max_clv_age_minutes < 0
     ):
         raise ValueError("max_clv_age_minutes must be nonnegative.")
-    covered_through = utc(coverage_end)
-    if not isinstance(covered_through, pd.Timestamp) or pd.isna(covered_through):
-        raise ValueError(
-            "coverage_end must be a valid timestamp for the complete trade archive."
-        )
+    coverage_by_ticker = coverage_end if isinstance(coverage_end, Mapping) else None
+    covered_through = None if coverage_by_ticker is not None else utc(coverage_end)
+    if coverage_by_ticker is None and (not isinstance(covered_through, pd.Timestamp) or pd.isna(covered_through)):
+        raise ValueError("coverage_end must be a valid timestamp.")
     metadata = normalize_timings(timings, family)
     clean = normalize_trade_prices(trades)
     grouped = {ticker: group for ticker, group in clean.groupby("ticker", sort=False)}
     grid = np.arange(0, 1, time_step)
     rows, audit = [], []
     for market in metadata.itertuples(index=False):
+        market_covered_through = (
+            utc(coverage_by_ticker.get(market.ticker))
+            if coverage_by_ticker is not None else covered_through
+        )
+        if not isinstance(market_covered_through, pd.Timestamp) or pd.isna(market_covered_through):
+            raise ValueError(f"Missing checked coverage end for {market.ticker}")
         entry = {
             "ticker": market.ticker,
             "event_ticker": market.event_ticker,
@@ -169,7 +175,7 @@ def build_fill_dataset(
             entry["status"] = "missing_timing"
         elif settle <= start or close <= start or close > settle:
             entry["status"] = "invalid_timing"
-        elif settle > covered_through:
+        elif settle > market_covered_through:
             entry["status"] = "incomplete_trade_horizon"
         elif getattr(market, "status", "finalized") not in ("finalized", "settled"):
             entry["status"] = "not_settled"

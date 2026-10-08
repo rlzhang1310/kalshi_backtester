@@ -34,12 +34,17 @@ python -m pip install -r requirements.txt
 python collect_data.py
 ```
 
-Use the menu to collect Kalshi trades and market metadata; after a completed
-backfill, choose **Kalshi Global Trades Refresh** to append newer trades.
-Then prepare a ticker family in the fill dashboard. Refresh that prepared
-family after adding archive data; the visualizers read saved family observations
-and do not automatically pick up new trade files. See [data collection](docs/data_collection.md)
-for checkpoints, local paths, and preparation steps. The data loader is
+Use the menu to collect Kalshi trades and market metadata, then complete and
+verify the [family-partitioned migration](docs/trade_reorganization.md). For
+initial adoption of one family, run:
+
+```powershell
+python collect_data.py trades --family KXNFLGAME --since 2026-09-01T00:00:00Z
+```
+
+Local charts and analyses read the published family dataset; fill dashboards read
+prepared observations and need family preparation after trade updates. See
+[data collection](docs/data_collection.md) for checkpoints and paths. The data loader is
 inspired by [Jon Becker's prediction-market-analysis project](https://github.com/Jon-Becker/prediction-market-analysis).
 
 ## Other commands

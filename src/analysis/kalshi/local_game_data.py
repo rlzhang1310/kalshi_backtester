@@ -15,6 +15,7 @@ from src.analysis.kalshi.util.sports_markets import (
     normalize_sport,
 )
 from src.indexers.kalshi.models import Market
+from src.analysis.kalshi.util.trades import family_trade_files
 
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parents[3] / "data"
@@ -131,10 +132,13 @@ class LocalGameStore:
         start: pd.Timestamp | None,
         end: pd.Timestamp | None,
     ) -> pd.DataFrame:
-        files = _files(self.data_dir / "kalshi" / "trades_global_staging")
+        dataset = self.data_dir / "kalshi" / "trades_by_series"
+        families = {ticker.split("-", 1)[0] for ticker in tickers}
+        files = [str(path) for family in sorted(families)
+                 for path in family_trade_files(dataset, family)]
         if not files:
             raise ValueError(
-                "No local trades in data/kalshi/trades_global_staging. Use --source api."
+                "No trades in the published family partition for this game. Use --source api."
             )
         where = "ticker IN (" + ",".join("?" for _ in tickers) + ")"
         params: list = list(tickers)

@@ -54,24 +54,23 @@ otherwise the estimate uses all eligible archived matches.
 The local loading path is:
 
 ```text
-data/kalshi/markets/*.parquet + data/kalshi/trades_global_staging/*.parquet
+data/kalshi/markets/*.parquet + data/kalshi/trades_by_series/<FAMILY>/*.parquet
   -> output/fill_probability/<FAMILY>/markets.parquet + trades.parquet
   -> normalized_trades.parquet -> snapshots.parquet
   -> dashboard estimates and CLV / No-CLV / Oddness visualizers
 ```
 
-Preparation reads **all local market files** and selects event tickers with
-the exact requested family prefix followed by `-`. It scans **all local global
-trade Parquet files**, including `refresh_*.parquet`, and extracts trades whose
-market ticker has that same family prefix. It then joins trades to the selected
-market/timing tickers, repairs YES prices, deduplicates trade IDs, and sorts
-each ticker history. This is a family subset of the global archive, not a
-sample of files or a fixed list of historical dates. Other ticker families do
-not feed a selected family's model.
+Preparation reads local market metadata and selects event tickers with the
+exact requested family prefix followed by `-`. It reads only that family's
+published `part-*.parquet` and appended `scoped_*.parquet` files, then joins
+trades to the selected market/timing tickers, repairs YES prices, deduplicates
+trade IDs, and sorts each ticker history. Other families do not feed the model.
+An unpublished migration is rejected rather than falling back to the mixed
+archive.
 
 Not every extracted print becomes a model row. A ticker needs valid scheduled
-start, actual settlement, and close times; settled/finalized status; archive
-coverage through settlement; trades before close; and a pregame trade for CLV.
+start, actual settlement, and close times; settled/finalized status; per-market
+checked coverage through settlement; trades before close; and a pregame trade for CLV.
 An optional maximum CLV age can exclude more tickers. The preparation audit
 records these exclusions in `ticker_audit.csv` and `ticker_summary.csv`.
 Eligible ticker histories become states on the configured normalized-time grid,
@@ -89,23 +88,19 @@ Selecting a ticker excludes its **entire event** from the reference pool;
 an optional settlement cutoff excludes events settled on or after that time.
 The dashboard does not pool different prepared families into one model.
 
-**Cache freshness:** New files in `data/` do not change existing prepared
-outputs. Without `prepare --refresh` (or the dashboard's refresh checkbox),
-preparation reuses cached market metadata, timing metadata, and family trades.
-Refresh after collecting new trades **or** markets. Check `manifest.json` for
-the saved state's counts and archive coverage, `trade_coverage.json` for the
-source data directory, and the modification times of `trades.parquet` and
-`snapshots.parquet` against the archive files. A newer archive file means the
-cache may omit relevant trades; its timestamp alone does not prove that the
-file contains trades from this family. `coverage_end` is the latest trade time
-seen when the archive was scanned, not a live freshness check.
+**Cache freshness:** Dashboards read saved observations. Preparation compares
+the selected family's file list and per-market checked ranges with the source
+signatures in `trade_coverage.json`. New files refresh the trade and timing
+caches; coverage-only changes rebuild observations from cached normalized
+trades. Run `prepare --refresh` after market metadata changes that do not add
+trade files or checked ranges. `manifest.json` reports the latest observed
+trade time, which is not proof of complete history.
 
 The preparation pipeline filters **exact family membership** at the event
 and market ticker boundary. A family ending in `MATCH` does not also match
 `MATCHTOTAL` or `MATCHEXTRA`. It reads all matching markets from
-`data/kalshi/markets/`, then scans the global trade archive once for the entire
-family. It does not scan 54 GB separately for each individual game.
-Extraction streams batches to Parquet. Normalization uses a disk-backed
+`data/kalshi/markets/`, then reads only the matching published family partition.
+Extraction uses a bounded-memory DuckDB Parquet copy. Normalization uses a disk-backed
 sort with a 2 GB DuckDB memory limit, followed by one ticker history at a
 time, so the entire family's prints need not fit in memory.
 
@@ -188,20 +183,23 @@ Files are saved under `output/fill_probability/<FAMILY>/`:
 | --- | --- |
 | `markets.parquet` | Every locally stored market in the family |
 | `timings.parquet` | Scheduled start, actual settlement, trading close, and source labels |
-| `trades.parquet` | Cached original family prints |
+| `trades.parquet` | Cached prints from the published family partition |
 | `normalized_trades.parquet` | Repaired prices, normalized time, and in-game flag per print |
 | `snapshots.parquet` | Conditional states and strictly future minima for all eligible tickers |
 | `ticker_audit.csv` | Every ticker's inclusion/exclusion reason and sample count |
 | `ticker_summary.csv` | Per-ticker CLV, timing, sample count, and inclusion/exclusion reason |
-| `trade_coverage.json` | Latest globally observed trade and archive path |
+| `trade_coverage.json` | Latest observed family trade, published source, and file/checked-range signature |
 | `manifest.json` | Definitions, counts, sampling settings, limitations |
 | `last_estimate.json` | Most recent conditional query and its estimates/support |
 
-Rebuilding reuses expensive inputs. After collecting additional market/trade
-data, run `prepare --refresh` to rescan and retrieve fresh metadata. The
-archive is assumed complete within its observed horizon; events settling
-after the latest globally observed trade are excluded as censored. Internal
-collection gaps cannot be detected from a last timestamp alone.
+Rebuilding reuses unchanged inputs. A market is eligible only when the scoped
+checkpoint contains a checked interval from no later than its earliest
+observed print or scheduled start through settlement. Markets without that
+per-ticker coverage appear as `incomplete_trade_horizon` in the audit. The
+copy-only migration's latest trade timestamp cannot establish coverage;
+collect the relevant range with `collect_data.py trades --family FAMILY
+--since ...` before preparing the family. Checked coverage does not prove
+Kalshi history before the requested start.
 
 For offline metadata or corrected starts, pass `prepare --timings times.csv`
 (Parquet also works) with columns:
@@ -220,7 +218,7 @@ A public trade print does not reveal your position in the bid queue, latency,
 available depth, cancellation priority, or how much of an order would execute.
 These estimates implement the requested touch/through scenarios; they are
 not guaranteed bounds on the fill rate of an arbitrary-sized live order.
-The legacy archive also does not store the block-trade flag now exposed by
+The copied archive also does not store the block-trade flag now exposed by
 [Kalshi's trades endpoint](https://docs.kalshi.com/api-reference/market/get-trades),
 so block prints cannot be separated in these historical files. Prices are
 the archived cent-resolution values, not reconstructed subcent quotes.

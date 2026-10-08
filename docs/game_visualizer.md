@@ -41,13 +41,14 @@ Kalshi still serves their history.
 
 ## Local data and price conventions
 
-Local mode reads `data/kalshi/markets/*.parquet` and
-`data/kalshi/trades_global_staging/*.parquet`. It filters selected markets
-while scanning bounded batches, repairs prices with the backtester's taker-
-side rule, and deduplicates trade IDs. Catalog discovery reads market metadata
-only and lists recognized game-winner events. A listed event may have no local
-trades. The first catalog scan may take a minute; scanning large trade
-archives can take longer. The notebook reuses its catalog on later searches.
+Local mode reads `data/kalshi/markets/*.parquet` and the selected family under
+`data/kalshi/trades_by_series/`. It requires a verified published migration,
+opens only that family's base and scoped files, pushes selected market and time
+filters into DuckDB, repairs prices with the backtester's taker-side rule, and
+deduplicates trade IDs. Catalog discovery reads market metadata only and lists
+recognized game-winner events. A listed event may have no local trades. The
+first catalog scan may take a minute; subsequent game trade reads avoid the
+mixed global archive. The notebook reuses its catalog on later searches.
 
 Local metadata lacks scheduled game start. Without `--start`, local charts
 begin at the first stored trade and may include pregame trading. API mode

@@ -16,8 +16,9 @@ from app.books import BookRegistry
 from app.config import Config
 from app.kalshi import ExchangeError, KalshiAdapter
 from app.markets import MarketService
-from app.models import OrderRequest, PairedOrderRequest, ticker
+from app.models import OrderRequest, PairedOrderRequest, PaperConfigureRequest, decimal, ticker
 from app.orders import AppError, OrderService
+from app.paper import FeeModel, PaperDesk, PaperPair
 from app.store import Store
 from app.stream import KalshiFeed
 
@@ -47,11 +48,18 @@ def create_app(config=None, adapter=None) -> FastAPI:
         app.state.feed = KalshiFeed(config, app.state.adapter, app.state.books, app.state.store)
         app.state.markets = MarketService(app.state.adapter, config, app.state.books, lambda: app.state.feed.healthy)
         app.state.orders = OrderService(config, app.state.adapter, app.state.markets, app.state.store, app.state.feed)
+        app.state.paper = PaperDesk(app.state.books, app.state.markets, app.state.feed, app.state.store,
+                                    config.environment, config.db_path.parent / "paper_evidence")
         app.state.feed.orders = app.state.orders
+        app.state.feed.paper = app.state.paper
         app.state.books.on_change = notify_viewers
-        app.state.store.on_change = notify_viewers
+        def on_order_change():
+            app.state.paper.refresh_owned()
+            notify_viewers()
+        app.state.store.on_change = on_order_change
         app.state.feed.on_change = notify_viewers
         app.state.markets.on_change = notify_viewers
+        app.state.paper.on_change = notify_viewers
         if config.trading_enabled and hasattr(app.state.adapter, "check_trade_scope"):
             await app.state.adapter.check_trade_scope()
         await app.state.orders.startup_recovery()
@@ -63,18 +71,78 @@ def create_app(config=None, adapter=None) -> FastAPI:
                 await app.state.orders.reconcile_all()
 
         task = asyncio.create_task(poll())
+        async def refresh_paper_metadata():
+            while True:
+                await asyncio.sleep(config.metadata_ttl_seconds)
+                pair = app.state.paper.config
+                if not pair:
+                    continue
+                try:
+                    metadata, fees = await prepare_paper((pair.primary_ticker, pair.other_ticker))
+                except Exception:
+                    app.state.paper.metadata = {}
+                    app.state.paper.fees = {}
+                    app.state.paper.evaluate("refresh", time.perf_counter_ns(), time.perf_counter_ns())
+                    continue
+                if pair != app.state.paper.config:
+                    continue
+                old_signature = [(app.state.paper.metadata.get(t, ({}, 0))[0].get(key), metadata[t][0].get(key))
+                                 for t in (pair.primary_ticker, pair.other_ticker)
+                                 for key in ("status", "price_ranges", "rules_primary", "rules_secondary")]
+                if fees != app.state.paper.fees or any(old != new for old, new in old_signature):
+                    was_observing = app.state.paper.observing
+                    app.state.paper.configure(PaperPair(**(vars(pair) | {"version": pair.version + 1})), metadata, fees)
+                    if was_observing:
+                        app.state.paper.start()
+                else:
+                    app.state.paper.metadata, app.state.paper.fees = metadata, fees
+                    app.state.paper.evaluate("refresh", time.perf_counter_ns(), time.perf_counter_ns())
+
+        refresh_task = asyncio.create_task(refresh_paper_metadata())
         try:
             yield
         finally:
             task.cancel()
+            refresh_task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
+            with suppress(asyncio.CancelledError):
+                await refresh_task
+            await app.state.paper.close()
             await app.state.feed.stop()
             await app.state.orders.stop()
             app.state.store.close()
             await app.state.adapter.close()
 
     app = FastAPI(title="Kalshi one-contract tool", lifespan=lifespan)
+
+    async def prepare_paper(tickers: tuple[str, str]):
+        metadata, fees = {}, {}
+        event_cache, series_cache = {}, {}
+        for market_ticker in tickers:
+            market = await app.state.adapter.get_market(market_ticker)
+            event_ticker = market.get("event_ticker")
+            if not event_ticker:
+                raise ValueError("Market has no event ticker for fee lookup")
+            if event_ticker not in event_cache:
+                event_cache[event_ticker] = await app.state.adapter.get_event(event_ticker)
+            event = event_cache[event_ticker]
+            series_ticker = event.get("series_ticker")
+            if not series_ticker:
+                raise ValueError("Event has no series ticker for fee lookup")
+            if series_ticker not in series_cache:
+                series_cache[series_ticker] = await app.state.adapter.get_series(series_ticker)
+            series = series_cache[series_ticker]
+            override_type, override_multiplier = event.get("fee_type_override"), event.get("fee_multiplier_override")
+            if (override_type is None) != (override_multiplier is None):
+                fee_type, multiplier = "unsupported", "-1"
+            else:
+                fee_type = override_type if override_type is not None else series.get("fee_type", "unsupported")
+                multiplier = override_multiplier if override_multiplier is not None else series.get("fee_multiplier", "-1")
+            fees[market_ticker] = FeeModel(fee_type, decimal(multiplier),
+                f"schedule:2026-07-07|series:{series.get('last_updated_ts')}|event:{event.get('last_updated_ts')}")
+            metadata[market_ticker] = (market, time.monotonic())
+        return metadata, fees
 
     @app.middleware("http")
     async def local_only(request: Request, call_next):
@@ -111,6 +179,10 @@ def create_app(config=None, adapter=None) -> FastAPI:
     @app.get("/app.js")
     async def javascript():
         return FileResponse(STATIC / "app.js", media_type="text/javascript")
+
+    @app.get("/paper.js")
+    async def paper_javascript():
+        return FileResponse(STATIC / "paper.js", media_type="text/javascript")
 
     @app.get("/api/status")
     async def status(request: Request):
@@ -149,6 +221,46 @@ def create_app(config=None, adapter=None) -> FastAPI:
             raise AppError(404 if exc.status == 404 else 503, code, "Market could not be loaded") from exc
         except Exception as exc:
             raise AppError(503, "market_unavailable", "Market could not be loaded") from exc
+
+    @app.get("/api/paper")
+    async def paper_state():
+        return app.state.paper.view()
+
+    @app.post("/api/paper/configure")
+    async def configure_paper(payload: PaperConfigureRequest):
+        if payload.primary_ticker == payload.other_ticker:
+            raise AppError(422, "same_market", "Paper arbitrage needs two distinct markets")
+        try:
+            metadata, fees = await prepare_paper((payload.primary_ticker, payload.other_ticker))
+        except Exception as exc:
+            raise AppError(503, "paper_metadata_unavailable", "Market or fee metadata could not be loaded") from exc
+        prior = app.state.paper.config
+        pair = PaperPair(payload.primary_ticker, payload.primary_outcome, payload.other_ticker,
+                         payload.other_outcome, payload.relationship, decimal(payload.quantity),
+                         decimal(payload.min_profit), decimal(payload.safety_margin),
+                         payload.direct_account, payload.settlement_asserted,
+                          prior.version + 1 if prior else 1, tuple(payload.delays_ms))
+        app.state.paper.configure(pair, metadata, fees)
+        app.state.feed.wake.set()
+        return app.state.paper.view()
+
+    @app.post("/api/paper/start")
+    async def start_paper():
+        try:
+            app.state.paper.start()
+        except ValueError as exc:
+            raise AppError(422, "paper_not_configured", str(exc)) from exc
+        return app.state.paper.view()
+
+    @app.post("/api/paper/stop")
+    async def stop_paper():
+        app.state.paper.stop()
+        return app.state.paper.view()
+
+    @app.post("/api/paper/reset")
+    async def reset_paper():
+        app.state.paper.reset()
+        return app.state.paper.view()
 
     @app.get("/api/events")
     async def events(request: Request, tickers: str = ""):

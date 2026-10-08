@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from src.analysis.kalshi.util.trades import create_organized_trades_view
 from src.common.analysis import Analysis, AnalysisOutput
 from src.common.interfaces.chart import ChartConfig, ChartType, UnitType
 
@@ -26,12 +27,13 @@ class KalshiCalibrationDeviationOverTimeAnalysis(Analysis):
             description="Kalshi calibration accuracy measured as mean absolute deviation over time",
         )
         base_dir = Path(__file__).parent.parent.parent.parent
-        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades")
+        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
         self.markets_dir = Path(markets_dir or base_dir / "data" / "kalshi" / "markets")
 
     def run(self) -> AnalysisOutput:
         """Execute the analysis and return outputs."""
         con = duckdb.connect()
+        create_organized_trades_view(con, self.trades_dir)
 
         # Query all trades joined with resolved market outcomes
         df = con.execute(
@@ -53,7 +55,7 @@ class KalshiCalibrationDeviationOverTimeAnalysis(Analysis):
                         WHEN t.taker_side = m.result THEN true
                         ELSE false
                     END AS won
-                FROM '{self.trades_dir}/*.parquet' t
+                FROM analysis_trades t
                 INNER JOIN resolved_markets m ON t.ticker = m.ticker
                 WHERE t.yes_price > 0 AND t.no_price > 0
 
@@ -70,7 +72,7 @@ class KalshiCalibrationDeviationOverTimeAnalysis(Analysis):
                         WHEN t.taker_side != m.result THEN true
                         ELSE false
                     END AS won
-                FROM '{self.trades_dir}/*.parquet' t
+                FROM analysis_trades t
                 INNER JOIN resolved_markets m ON t.ticker = m.ticker
                 WHERE t.yes_price > 0 AND t.no_price > 0
             )

@@ -1,4 +1,5 @@
 from dataclasses import asdict
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -26,9 +27,19 @@ START = "2025-09-07T17:00:00Z"
 @pytest.fixture
 def archive(tmp_path):
     markets = tmp_path / "kalshi" / "markets"
-    trades = tmp_path / "kalshi" / "trades_global_staging"
+    dataset = tmp_path / "kalshi" / "trades_by_series"
+    trades = dataset / "series_ticker=KXNFLGAME"
     markets.mkdir(parents=True)
-    trades.mkdir()
+    trades.mkdir(parents=True)
+    metadata = dataset / "_metadata"
+    metadata.mkdir()
+    (metadata / "dataset.json").write_text(json.dumps({
+        "run_id": "fixture", "validation_status": "passed",
+        "partition_key": "series_ticker",
+    }))
+    pd.DataFrame({"family": ["KXNFLGAME"], "row_count": [5]}).to_parquet(
+        metadata / "family_catalog.parquet", index=False
+    )
     rows = [
         asdict(
             Market.from_dict(
@@ -73,8 +84,8 @@ def archive(tmp_path):
             ),
         }
     )
-    frame.to_parquet(trades / "historical_0.parquet")
-    frame.iloc[[1]].to_parquet(trades / "live_0.parquet")
+    frame.to_parquet(trades / "part-0.parquet")
+    frame.iloc[[1]].to_parquet(trades / "scoped_0.parquet")
     (trades / "._historical_0.parquet").write_text("not parquet")
     return tmp_path
 

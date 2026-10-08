@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from src.analysis.kalshi.util.trades import create_organized_trades_view
 from src.common.analysis import Analysis, AnalysisOutput
 from src.common.interfaces.chart import ChartConfig, ChartType, UnitType
 
@@ -30,12 +31,13 @@ class MakerTakerGapOverTimeAnalysis(Analysis):
             description="Quarterly maker-taker excess returns over time",
         )
         base_dir = Path(__file__).parent.parent.parent.parent
-        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades")
+        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
         self.markets_dir = Path(markets_dir or base_dir / "data" / "kalshi" / "markets")
 
     def run(self) -> AnalysisOutput:
         """Execute the analysis and return outputs."""
         con = duckdb.connect()
+        create_organized_trades_view(con, self.trades_dir)
 
         df = con.execute(
             f"""
@@ -52,7 +54,7 @@ class MakerTakerGapOverTimeAnalysis(Analysis):
                     CASE WHEN t.taker_side = 'yes' THEN t.yes_price ELSE t.no_price END AS price,
                     CASE WHEN t.taker_side = m.result THEN 1.0 ELSE 0.0 END AS won,
                     t.count AS contracts
-                FROM '{self.trades_dir}/*.parquet' t
+                FROM analysis_trades t
                 INNER JOIN resolved_markets m ON t.ticker = m.ticker
 
                 UNION ALL
@@ -63,7 +65,7 @@ class MakerTakerGapOverTimeAnalysis(Analysis):
                     CASE WHEN t.taker_side = 'yes' THEN t.no_price ELSE t.yes_price END AS price,
                     CASE WHEN t.taker_side != m.result THEN 1.0 ELSE 0.0 END AS won,
                     t.count AS contracts
-                FROM '{self.trades_dir}/*.parquet' t
+                FROM analysis_trades t
                 INNER JOIN resolved_markets m ON t.ticker = m.ticker
             )
             SELECT

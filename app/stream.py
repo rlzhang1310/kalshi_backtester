@@ -16,6 +16,7 @@ class KalshiFeed:
     def __init__(self, config, adapter, books: BookRegistry, store):
         self.config, self.adapter, self.books, self.store = config, adapter, books, store
         self.orders = None
+        self.paper = None
         self.viewers: dict[str, tuple[set[str], float]] = {}
         self.connected = False
         self.last_error: str | None = None
@@ -65,6 +66,8 @@ class KalshiFeed:
                 self.viewers.pop(key, None)
         watched = set().union(*(tickers for tickers, _ in self.viewers.values())) if self.viewers else set()
         watched.update(record["ticker"] for record in self.store.unresolved())
+        if self.paper:
+            watched.update(self.paper.tickers)
         return watched
 
     def start(self):
@@ -99,6 +102,8 @@ class KalshiFeed:
                     self.private_reconciled = False
                     self.generation += 1
                     self.books.disconnect()
+                    if self.paper:
+                        self.paper.evaluate("refresh", time.perf_counter_ns(), time.perf_counter_ns())
                     self.touch()
                     backoff = 1.0
                     await self._connection(websocket, self.generation)
@@ -119,6 +124,8 @@ class KalshiFeed:
             self.private_sid = None
             self.private_reconciled = False
             self.books.disconnect()
+            if self.paper:
+                self.paper.evaluate("refresh", time.perf_counter_ns(), time.perf_counter_ns())
             self.touch()
             if self.orders:
                 self.orders.recovering = True
@@ -199,6 +206,7 @@ class KalshiFeed:
         recovery = asyncio.create_task(reconcile_after_connect())
         try:
             async for wire in websocket:
+                received_ns = time.perf_counter_ns()
                 event = json.loads(wire)
                 event_type = event.get("type")
                 sid = event.get("sid")
@@ -237,6 +245,10 @@ class KalshiFeed:
                         book.snapshot(generation, sid, seq, message)
                     else:
                         book.delta(generation, sid, seq, message, shared_sequence=True)
+                    applied_ns = time.perf_counter_ns()
+                    book.last_received_ns = received_ns
+                    if self.paper:
+                        self.paper.evaluate(market_ticker, received_ns, applied_ns)
                     self.last_error = None
                     self.books.touch()
                 elif event_type == "user_order" and sid == self.private_sid and isinstance(message, dict):

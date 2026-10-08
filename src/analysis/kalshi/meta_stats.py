@@ -7,6 +7,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
+from src.analysis.kalshi.util.trades import create_organized_trades_view
 from src.common.analysis import Analysis, AnalysisOutput
 
 
@@ -23,21 +24,22 @@ class MetaStatsAnalysis(Analysis):
             description="Dataset meta statistics including trade and market counts",
         )
         base_dir = Path(__file__).parent.parent.parent.parent
-        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades")
+        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
         self.markets_dir = Path(markets_dir or base_dir / "data" / "kalshi" / "markets")
 
     def run(self) -> AnalysisOutput:
         """Execute the analysis and return outputs."""
         con = duckdb.connect()
+        create_organized_trades_view(con, self.trades_dir)
 
         # Trade statistics
         trade_stats = con.execute(
-            f"""
+            """
             SELECT
                 COUNT(*) AS num_trades,
                 SUM(count) AS total_volume,
                 COUNT(DISTINCT ticker) AS num_tickers
-            FROM '{self.trades_dir}/*.parquet'
+            FROM analysis_trades
             """
         ).fetchone()
 

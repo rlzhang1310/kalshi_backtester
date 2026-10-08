@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
+from bisect import bisect_left
 
 from app.models import canonical, decimal
 
@@ -38,17 +39,22 @@ class LiveBook:
     seq: int | None = None
     yes: dict[Decimal, Decimal] = field(default_factory=dict)
     no: dict[Decimal, Decimal] = field(default_factory=dict)
+    yes_prices: list[Decimal] = field(default_factory=list)
+    no_prices: list[Decimal] = field(default_factory=list)
     snapshot_at: str | None = None
     last_book_change_at: str | None = None
+    last_received_ns: int | None = None
 
     def subscribe(self, generation: int, sid: int):
         self.generation, self.sid, self.seq = generation, sid, None
+        self.last_received_ns = None
         self.state = "syncing"
 
     def invalidate(self):
         self.state = "recovering"
         self.sid = None
         self.seq = None
+        self.last_received_ns = None
 
     def snapshot(self, generation: int, sid: int, seq: int, message: dict):
         if generation != self.generation or sid != self.sid or not isinstance(seq, int):
@@ -69,6 +75,7 @@ class LiveBook:
                     dest[price] = quantity
         self._check(yes, no)
         self.yes, self.no, self.seq = yes, no, seq
+        self.yes_prices, self.no_prices = sorted(yes), sorted(no)
         self.snapshot_at = self.last_book_change_at = now_iso()
         self.state = "live"
 
@@ -94,6 +101,12 @@ class LiveBook:
             new_target[price] = updated
         self._check(new_yes, new_no)
         self.yes, self.no, self.seq = new_yes, new_no, seq
+        prices = self.yes_prices if side == "yes" else self.no_prices
+        index = bisect_left(prices, price)
+        if updated == 0 and index < len(prices) and prices[index] == price:
+            prices.pop(index)
+        elif updated > 0 and (index == len(prices) or prices[index] != price):
+            prices.insert(index, price)
         if change != 0:
             self.last_book_change_at = now_iso()
 
@@ -104,8 +117,8 @@ class LiveBook:
 
     def view(self, healthy: bool) -> dict:
         state = self.state if healthy or self.state != "live" else "recovering"
-        yes_bids = sorted(self.yes.items(), reverse=True)
-        no_bids = sorted(self.no.items(), reverse=True)
+        yes_bids = [(price, self.yes[price]) for price in reversed(self.yes_prices)]
+        no_bids = [(price, self.no[price]) for price in reversed(self.no_prices)]
 
         def levels(source, complement=False):
             return [{"price": canonical(1 - price if complement else price), "quantity": canonical(qty)}

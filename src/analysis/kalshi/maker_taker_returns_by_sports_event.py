@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from src.analysis.kalshi.util.categories import CATEGORY_SQL, get_sports_event_category, is_sports_category
+from src.analysis.kalshi.util.trades import create_organized_trades_view
 from src.common.analysis import Analysis, AnalysisOutput
 from src.common.interfaces.chart import ChartConfig, ChartType, UnitType
 
@@ -31,12 +32,12 @@ class MakerTakerReturnsBySportsEventAnalysis(Analysis):
             description="Maker vs taker excess returns by sports event",
         )
         base_dir = Path(__file__).parent.parent.parent.parent
-        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades")
+        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
         self.markets_dir = Path(markets_dir or base_dir / "data" / "kalshi" / "markets")
 
     def _has_input_data(self) -> bool:
         """Return True when both market and trade parquet inputs exist."""
-        return bool(list(self.markets_dir.glob("*.parquet"))) and bool(list(self.trades_dir.glob("*.parquet")))
+        return bool(list(self.markets_dir.glob("*.parquet"))) and (self.trades_dir / "_metadata" / "dataset.json").is_file()
 
     def run(self) -> AnalysisOutput:
         """Execute the analysis and return outputs."""
@@ -58,6 +59,7 @@ class MakerTakerReturnsBySportsEventAnalysis(Analysis):
             return AnalysisOutput(figure=self._create_figure(empty_df), data=empty_df, chart=self._create_chart(empty_df))
 
         con = duckdb.connect()
+        create_organized_trades_view(con, self.trades_dir)
 
         df = con.execute(
             f"""
@@ -74,7 +76,7 @@ class MakerTakerReturnsBySportsEventAnalysis(Analysis):
                     CASE WHEN t.taker_side = m.result THEN 1.0 ELSE 0.0 END AS won,
                     t.count AS contracts,
                     t.count * (CASE WHEN t.taker_side = 'yes' THEN t.yes_price ELSE t.no_price END) / 100.0 AS volume_usd
-                FROM '{self.trades_dir}/*.parquet' t
+                FROM analysis_trades t
                 INNER JOIN resolved_markets m ON t.ticker = m.ticker
             ),
             maker_positions AS (
@@ -84,7 +86,7 @@ class MakerTakerReturnsBySportsEventAnalysis(Analysis):
                     CASE WHEN t.taker_side != m.result THEN 1.0 ELSE 0.0 END AS won,
                     t.count AS contracts,
                     t.count * (CASE WHEN t.taker_side = 'yes' THEN t.no_price ELSE t.yes_price END) / 100.0 AS volume_usd
-                FROM '{self.trades_dir}/*.parquet' t
+                FROM analysis_trades t
                 INNER JOIN resolved_markets m ON t.ticker = m.ticker
             ),
             taker_stats AS (

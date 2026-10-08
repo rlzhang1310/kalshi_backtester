@@ -29,7 +29,6 @@ class WinRateByPriceAnalysis(Analysis):
     def __init__(
         self,
         trades_dir: Path | str | None = None,
-        global_trades_dir: Path | str | None = None,
         markets_dir: Path | str | None = None,
         sport: str | None = None,
         market_category: str | None = None,
@@ -39,10 +38,7 @@ class WinRateByPriceAnalysis(Analysis):
             description="Win rate vs price by selectable sport and market category",
         )
         base_dir = Path(__file__).parent.parent.parent.parent
-        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades")
-        self.global_trades_dir = Path(
-            global_trades_dir or base_dir / "data" / "kalshi" / "trades_global_staging"
-        )
+        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
         self.markets_dir = Path(markets_dir or base_dir / "data" / "kalshi" / "markets")
         self.sport: str | None = None
         self.market_category: str | None = None
@@ -73,7 +69,6 @@ class WinRateByPriceAnalysis(Analysis):
     def run(self) -> AnalysisOutput:
         """Execute the analysis and return outputs."""
         con = duckdb.connect()
-        create_combined_trades_view(con, self.trades_dir, self.global_trades_dir)
 
         markets_glob = str(self.markets_dir / "*.parquet").replace("'", "''")
         filter_sql = ""
@@ -97,17 +92,23 @@ class WinRateByPriceAnalysis(Analysis):
 
         # Materialize a filtered selection once so the large market archive is
         # not copied into Python or re-scanned for both the count and trade join.
-        selected_relation_type = "TABLE" if filter_sql else "VIEW"
         con.execute(
             f"""
-            CREATE TEMP {selected_relation_type} selected_markets AS
-            SELECT ticker, result, volume
+            CREATE TEMP TABLE selected_markets AS
+            SELECT ticker, event_ticker, result, volume
             FROM read_parquet('{markets_glob}', union_by_name = true)
             WHERE status = 'finalized'
               AND result IN ('yes', 'no')
               {filter_sql}
             """
         )
+
+        families = None if self.sport is None else [
+            row[0] for row in con.execute(
+                "SELECT DISTINCT split_part(event_ticker, '-', 1) FROM selected_markets"
+            ).fetchall() if row[0]
+        ]
+        create_combined_trades_view(con, self.trades_dir, families=families)
 
         market_summary = con.execute(
             "SELECT COUNT(*) AS total_markets FROM selected_markets"

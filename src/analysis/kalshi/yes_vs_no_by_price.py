@@ -8,6 +8,7 @@ import duckdb
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from src.analysis.kalshi.util.trades import create_organized_trades_view
 from src.common.analysis import Analysis, AnalysisOutput
 from src.common.interfaces.chart import ChartConfig, ChartType, UnitType
 
@@ -24,35 +25,36 @@ class YesVsNoByPriceAnalysis(Analysis):
             description="YES vs NO volume by price with taker/maker breakdown",
         )
         base_dir = Path(__file__).parent.parent.parent.parent
-        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades")
+        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
 
     def run(self) -> AnalysisOutput:
         """Execute the analysis and return outputs."""
         con = duckdb.connect()
+        create_organized_trades_view(con, self.trades_dir)
 
         df = con.execute(
-            f"""
+            """
             WITH taker_yes AS (
                 SELECT yes_price AS price, SUM(count) AS contracts
-                FROM '{self.trades_dir}/*.parquet'
+                FROM analysis_trades
                 WHERE taker_side = 'yes'
                 GROUP BY yes_price
             ),
             taker_no AS (
                 SELECT no_price AS price, SUM(count) AS contracts
-                FROM '{self.trades_dir}/*.parquet'
+                FROM analysis_trades
                 WHERE taker_side = 'no'
                 GROUP BY no_price
             ),
             maker_yes AS (
                 SELECT yes_price AS price, SUM(count) AS contracts
-                FROM '{self.trades_dir}/*.parquet'
+                FROM analysis_trades
                 WHERE taker_side = 'no'
                 GROUP BY yes_price
             ),
             maker_no AS (
                 SELECT no_price AS price, SUM(count) AS contracts
-                FROM '{self.trades_dir}/*.parquet'
+                FROM analysis_trades
                 WHERE taker_side = 'yes'
                 GROUP BY no_price
             ),

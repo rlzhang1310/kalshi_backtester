@@ -5,7 +5,7 @@ let backendReachable = false, streamHealthy = false, lastStateAt = 0, eventSourc
 let streamGeneration = 0, streamEpoch = null, streamRevision = 0, orderFingerprint = "";
 let sessionEpoch = null, refreshingSession = false;
 const draft = {mode: "single", secondTarget: "other_market", relationship: null, locked: null,
-  pricing: "live", offset: 0, fixedUnits: null, spreadTouched: false};
+  pricing: "live", spreadTouched: false};
 const metrics = {display: [], dispatch: [], exchange: []};
 const sample = (name, value) => {
   if (!Number.isFinite(value) || value < 0) return;
@@ -60,23 +60,21 @@ const onGrid = (units, ranges) => ranges.some(range => {
   const start = dollarUnits(range.start), end = dollarUnits(range.end), step = dollarUnits(range.step);
   return start !== null && end !== null && step !== null && step > 0n && units >= start && units <= end && (units - start) % step === 0n;
 });
-const fresh = card => streamHealthy && card.data?.book_state === "live" && !card.data.stale;
+const fresh = card => streamHealthy && card?.data?.book_state === "live" && !card.data.stale;
 const active = order => !["filled", "canceled", "expired", "rejected"].includes(order.status);
+const notifyPaperSelectionChange = () => {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("paper-desk-selection-changed"));
+};
 const selectedCard = () => selected === null ? null : cards[selected];
 const otherCard = () => selected === null ? null : cards[1 - selected];
 const opposite = outcome => outcome === "yes" ? "no" : "yes";
 const gridFor = (card, units) => !!card?.data?.price_ranges && units > 0n && units < 10000n &&
   onGrid(units, card.data.price_ranges) && onGrid(10000n - units, card.data.price_ranges);
-const nextGrid = (card, units, direction, accept = () => true) => {
-  if (units === null || !card?.data) return null;
-  for (let value = units + BigInt(direction); value > 0n && value < 10000n; value += BigInt(direction))
-    if (gridFor(card, value) && accept(value)) return value;
-  return null;
-};
 function clearDraft() {
-  draft.locked = null; draft.pricing = "live"; draft.offset = 0; draft.fixedUnits = null; draft.spreadTouched = false;
-  $("tick-offset").value = "0"; $("spread").value = ""; $("price").value = "";
+  draft.locked = null; draft.pricing = "live"; draft.spreadTouched = false;
+  $("spread").value = ""; $("price").value = "";
   ticketError = ""; ticketNotice = "";
+  notifyPaperSelectionChange();
 }
 function otherMarketCandidate() {
   const primary = selectedCard(), other = otherCard();
@@ -108,13 +106,7 @@ function primaryUnits() {
   const card = selectedCard();
   if (draft.pricing === "fixed") return centsUnits($("price").value);
   const bid = card?.data?.quotes?.[card.outcome]?.bid_price;
-  let units = bid ? dollarUnits(bid) : null;
-  if (units === null || !Number.isInteger(draft.offset) || Math.abs(draft.offset) > 100) return null;
-  for (let step = 0; step < Math.abs(draft.offset); step++) {
-    units = nextGrid(card, units, Math.sign(draft.offset));
-    if (units === null) return null;
-  }
-  return units;
+  return bid ? dollarUnits(bid) : null;
 }
 function secondUnits(primary) {
   const spread = spreadUnits($("spread").value);
@@ -175,17 +167,17 @@ function buildCardView(card, body) {
     const pair = el("div", "", "quote-pair");
     const bidBox = el("div"), askBox = el("div");
     const bid = el("strong", "—"), ask = el("strong", "—");
-    append(bidBox, el("span", "Best bid"), bid);
-    append(askBox, el("span", "Best ask"), ask);
+    const bidSize = el("small", "Size —"), askSize = el("small", "Size —");
+    append(bidBox, el("span", "BID"), bid, bidSize);
+    append(askBox, el("span", "ASK"), ask, askSize);
     append(pair, bidBox, askBox);
-    const size = el("small");
-    append(button, name, pair, size);
+    append(button, name, pair);
     button.addEventListener("click", () => selectOutcome(card, outcome));
     sideOptions.appendChild(button);
-    sides[outcome] = {button, bid, ask, size, action};
+    sides[outcome] = {button, bid, ask, bidSize, askSize, action};
   }
   const book = el("details", "", "book-details"), bookLabel = el("summary");
-  book.open = true;
+  book.open = false;
   const bookGrid = el("div", "", "book-grid"), depth = {};
   for (const side of ["bids", "asks"]) {
     const column = el("div", "", "book-column");
@@ -197,13 +189,11 @@ function buildCardView(card, body) {
   const ownOrder = el("p", "", "own-order"), bookNote = el("p", "Visible size is not a guaranteed fill or queue position.", "book-footnote");
   append(book, bookLabel, bookGrid, ownOrder, bookNote);
   book.addEventListener("toggle", () => { if (book.open) renderCard(card); });
-  const footer = el("div", "", "market-footer"), spread = el("span"), marketStatus = el("strong");
-  append(footer, spread, marketStatus);
   const rules = el("details", "", "rules-details"), primary = el("p"), secondary = el("p");
   append(rules, el("summary", "Market rules"), primary, secondary);
   const error = el("p", "", "market-error");
-  body.replaceChildren(title, tickerLine, subtitle, el("p", "Choose YES or NO to fill the order ticket.", "market-intro"), sideOptions, book, footer, rules, error);
-  card.view = {title, tickerLine, subtitle, sides, book, bookLabel, depth, ownOrder, spread, marketStatus, primary, secondary, error, depthFingerprint: null};
+  body.replaceChildren(title, tickerLine, subtitle, sideOptions, book, rules, error);
+  card.view = {title, tickerLine, subtitle, sides, book, bookLabel, depth, ownOrder, primary, secondary, error, depthFingerprint: null};
 }
 
 function renderCard(card) {
@@ -236,13 +226,15 @@ function renderCard(card) {
     const quote = data.quotes?.[outcome] || {};
     const side = view.sides[outcome];
     side.button.setAttribute("aria-pressed", String(card.outcome === outcome));
-    side.action.textContent = selectedCard() === card ? "PRIMARY" : selected === null ? "SELECT" : "OTHER CARD";
+    side.action.textContent = selected === null ? "SELECT" : card.outcome !== outcome ? "CHOOSE" :
+      selectedCard() === card ? "PRIMARY" : "OTHER";
     side.bid.textContent = quote.bid_price ? cents(quote.bid_price) : "—";
     side.ask.textContent = quote.ask_price ? cents(quote.ask_price) : "—";
-    side.size.textContent = `${quote.bid_price ? `Bid size ${quote.bid_quantity}` : "No visible bid"} · ${quote.ask_price ? `ask size ${quote.ask_quantity}` : "no visible ask"}`;
+    side.bidSize.textContent = `Size ${quote.bid_price ? quote.bid_quantity : "—"}`;
+    side.askSize.textContent = `Size ${quote.ask_price ? quote.ask_quantity : "—"}`;
   }
-  view.bookLabel.textContent = `Order book depth · ${card.outcome.toUpperCase()}`;
   const quote = data.quotes?.[card.outcome] || {};
+  view.bookLabel.textContent = `${card.outcome.toUpperCase()} depth · spread ${quote.spread ? cents(quote.spread) : "—"}`;
   const book = data.depth?.[card.outcome] || {bids: [], asks: []};
   const own = orders.find(order => order.ticker === data.ticker && order.outcome === card.outcome &&
     order.status === "resting" && Number(order.remaining_quantity) > 0);
@@ -281,8 +273,6 @@ function renderCard(card) {
   view.ownOrder.textContent = own && ![...(book.bids || []), ...(book.asks || [])].some(level => level.price === own.limit_price) ?
     `Your order: ${cents(own.limit_price)} · ${own.remaining_quantity} remaining` : "";
   view.ownOrder.hidden = !view.ownOrder.textContent;
-  view.spread.textContent = `Selected ${card.outcome.toUpperCase()} spread: ${quote.spread ? cents(quote.spread) : "—"}`;
-  view.marketStatus.textContent = data.status || "Unavailable";
   view.primary.textContent = data.rules?.primary || "No primary rules supplied.";
   view.secondary.textContent = data.rules?.secondary || "";
   view.secondary.hidden = !view.secondary.textContent;
@@ -581,63 +571,62 @@ function renderManualTicket() {
   $("pair-controls").hidden = !paired; $("pair-pricing").hidden = !paired;
   $("relationship-controls").hidden = draft.secondTarget !== "other_market";
   $("same-market-state").hidden = draft.secondTarget !== "same_market";
-  $("offset-controls").hidden = draft.pricing !== "live";
   $("price").readOnly = draft.pricing === "live";
-  $("target").textContent = data ? data.title : "Choose YES or NO on a market";
   $("target-ticker").textContent = data ? data.ticker : "No market selected";
   $("outcome").textContent = data ? card.outcome.toUpperCase() : "—";
   const quote = data?.quotes?.[card.outcome] || {};
-  $("ticket-bid").textContent = quote.bid_price ? cents(quote.bid_price) : "—";
-  $("ticket-ask").textContent = quote.ask_price ? cents(quote.ask_price) : "—";
+  $("use-bid").hidden = draft.pricing === "live";
   $("use-bid").disabled = !quote.bid_price;
-  $("price-help").textContent = draft.pricing === "live" ? "Follows the primary best bid plus your tick offset." :
-    "Fixed until you select Follow best bid or Use current book.";
+  $("price-help").textContent = draft.pricing === "live" ? "Updates with the primary best bid." :
+    "Stays at your chosen limit until you change it.";
   const lifetime = status?.order_expiry_seconds || 300;
   $("lifetime").textContent = lifetime % 60 === 0 ? `${lifetime / 60} minutes` : `${lifetime} seconds`;
   const units = primaryUnits();
   if (draft.pricing === "live") $("price").value = units === null ? "" : centsText(units);
   const other = otherCard();
   const candidate = otherMarketCandidate();
+  const lockedOther = !!(paired && draft.secondTarget === "other_market" && secondSelection());
   $("swap-primary").hidden = !data || !other?.data;
   $("other-market-name").textContent = other?.ticker || "Load the other market";
   const mappedOutcome = candidate?.outcome;
-  $("other-market-selection").textContent = !other?.data ? other?.ticker ? "Waiting for this market's book." : "Enter a ticker on the other card." :
-    other.ticker === card?.ticker ? "Same ticker: choose Opposite side of same market above." :
-    mappedOutcome ? `Selected ${other.outcome.toUpperCase()} → second buy ${mappedOutcome.toUpperCase()}${draft.locked ? " · locked" : " · lock to quote"}` :
-    `Selected ${other.outcome.toUpperCase()} · choose the payoff relationship.`;
-  const otherQuote = other?.data?.quotes?.[mappedOutcome || other.outcome] || {};
-  $("other-quote-title").textContent = mappedOutcome ? `SECOND BUY ${mappedOutcome.toUpperCase()} QUOTES` :
-    other?.data ? `SELECTED ${other.outcome.toUpperCase()} QUOTES` : "OTHER CARD QUOTES";
-  $("other-market-bid").textContent = otherQuote.bid_price ? cents(otherQuote.bid_price) : "—";
-  $("other-market-ask").textContent = otherQuote.ask_price ? cents(otherQuote.ask_price) : "—";
+  $("other-market-selection").textContent = !other?.data ? other?.ticker ? "Waiting for its book." : "Enter a ticker on the other card." :
+    other.ticker === card?.ticker ? "Choose Same market above." :
+    mappedOutcome ? `${other.outcome.toUpperCase()} selected → buy ${mappedOutcome.toUpperCase()}${lockedOther ? " · locked" : " · lock to post"}` :
+    `${other.outcome.toUpperCase()} selected · choose the settlement relationship.`;
   if (paired && draft.secondTarget === "other_market") {
+    $("lock-relationship").hidden = lockedOther;
     $("lock-relationship").disabled = !data || !other?.data || card.ticker === other.ticker || !draft.relationship || !fresh(card) || !fresh(other);
     $("lock-relationship").textContent = candidate && draft.relationship ? `Lock ${card.ticker} + ${other.ticker}` : "Lock relationship";
-    $("relationship-state").textContent = draft.locked ?
-      `Locked: ${card.ticker} ${card.outcome.toUpperCase()} ↔ ${other.ticker} ${other.outcome.toUpperCase()} · ${draft.relationship === "same_outcome" ? "same outcome" : "opposite outcomes"}` :
+    $("relationship-state").textContent = lockedOther ?
+      `Locked · second buy ${other.ticker} ${mappedOutcome.toUpperCase()}` :
       data && other?.data && card.ticker === other.ticker ? "For one ticker, choose Opposite side of same market." :
-      candidate && draft.relationship ? `${other.ticker} is already loaded as the second card. Confirm this ${draft.relationship === "same_outcome" ? "same outcome" : "opposite outcomes"} relationship to enable its price.` :
-      candidate ? `${other.ticker} is loaded. Choose how the two selected outcomes settle, then lock.` :
+      candidate && draft.relationship ? `Second buy: ${other.ticker} ${mappedOutcome.toUpperCase()}. Lock this mapping.` :
+      candidate ? `${other.ticker} is loaded. Choose the payoff relationship, then lock.` :
       "Load a distinct other market, choose its outcome, then lock the relationship.";
   }
   defaultSpread();
   const second = secondSelection(), secondPrice = paired ? secondUnits(units) : null;
+  $("use-second-bid").hidden = draft.secondTarget !== "other_market" || !second;
   $("use-second-bid").disabled = !second || second.card !== other ||
     !second.card.data?.quotes?.[second.outcome]?.bid_price || units === null;
   const pulse = $("price-pulse"); pulse.replaceChildren();
-  const addPulse = (label, market, outcome, note = "") => {
+  const addPulse = (label, market, outcome) => {
     const quote = market?.data?.quotes?.[outcome] || {};
     const item = el("div", "", "pulse-item");
+    const values = el("div", "", "pulse-values");
+    append(values,
+      el("span", "BID", "pulse-side"), el("strong", quote.bid_price ? cents(quote.bid_price) : "—", "pulse-number"),
+      el("span", "ASK", "pulse-side"), el("strong", quote.ask_price ? cents(quote.ask_price) : "—", "pulse-number"));
     append(item, el("span", label, "pulse-label"),
-      el("strong", market?.ticker && outcome ? `${market.ticker} · ${outcome.toUpperCase()}` : "Select a market"),
-      el("span", `Bid ${quote.bid_price ? cents(quote.bid_price) : "—"}   Ask ${quote.ask_price ? cents(quote.ask_price) : "—"}${note ? ` · ${note}` : ""}`, "pulse-quote"));
+      el("strong", market?.ticker && outcome ? `${market.ticker} · ${outcome.toUpperCase()}` : "Select a market", "pulse-market"),
+      values);
     pulse.appendChild(item);
   };
   addPulse(`PRIMARY · ${fresh(card) ? "LIVE" : "WAITING"}`, card, card?.outcome);
   if (paired) {
     if (second) addPulse(`SECOND · ${fresh(second.card) ? "LIVE" : "WAITING"}`, second.card, second.outcome);
     else if (draft.secondTarget === "other_market" && other?.data)
-      addPulse("OTHER CARD · LOCK TO POST", other, candidate?.outcome || other.outcome, candidate?.outcome ? "mapped outcome" : "selected outcome");
+      addPulse("OTHER CARD · LOCK TO POST", other, candidate?.outcome || other.outcome);
     else addPulse("SECOND", null, null);
   }
   const preview = $("preview-legs"); preview.replaceChildren();
@@ -655,15 +644,9 @@ function renderManualTicket() {
     if (paired) addPreview("2", second?.card?.ticker || (draft.secondTarget === "other_market" ? other?.ticker : data?.ticker),
       second?.outcome || candidate?.outcome || (draft.secondTarget === "same_market" && card ? opposite(card.outcome) : null),
       second ? secondPrice : null, second ? "" : "LOCK PENDING"); }
-  $("quantity").textContent = (frozen ? frozen.length === 2 : paired) ? "1 contract per leg" : "1 contract";
   const costUnits = frozen ? frozen.reduce((total, leg) => leg.price === null ? null : total === null ? null : total + leg.price, 0n) :
     units !== null && (!paired || secondPrice !== null && secondPrice > 0n && secondPrice < 10000n) ? units + (paired ? secondPrice : 0n) : null;
   $("cost").textContent = costUnits === null ? "—" : centsText(costUnits) + (frozen?.length === 2 || paired && !frozen ? "¢ total" : "¢");
-  if (!frozen && paired && units !== null && secondPrice !== null && secondPrice > 0n && secondPrice < 10000n) {
-    const midpointHalfUnits = units + 10000n - secondPrice;
-    const midpoint = `${midpointHalfUnits / 200n}.${String(midpointHalfUnits % 200n * 5n).padStart(3, "0").replace(/0+$/, "") || "0"}`;
-    $("midpoint").textContent = `Complement-normalized midpoint: ${midpoint}¢ · spread ${$("spread").value}¢`;
-  } else $("midpoint").textContent = "";
   const legs = data ? [{card, outcome: card.outcome, price: units}] : [];
   if (paired && second) legs.push({card: second.card, outcome: second.outcome, price: secondPrice});
   let reason = "";
@@ -685,7 +668,6 @@ function renderManualTicket() {
   else if (paired && draft.secondTarget === "other_market" && !fresh(other)) reason = `Waiting for ${other.ticker}'s live book.`;
   else if (paired && draft.secondTarget === "other_market" && !draft.relationship) reason = `Choose how ${card.ticker} and ${other.ticker} settle, then lock the relationship.`;
   else if (paired && !second) reason = `${other.ticker} is loaded as the second card. Lock the relationship above to post.`;
-  else if (draft.pricing === "live" && (!Number.isInteger(draft.offset) || Math.abs(draft.offset) > 100)) reason = "Enter a whole tick offset from -100 to 100.";
   else if (paired && spreadUnits($("spread").value) === null) reason = "Enter a valid spread in cents (up to two decimal places).";
   else for (const leg of legs) {
     if (!fresh(leg.card) || !leg.card.data.tradable) { reason = `${leg.card.ticker} book is not live and tradable.`; break; }
@@ -699,7 +681,7 @@ function renderManualTicket() {
   readiness.textContent = submitting ? "Submitting" : pending ? "Checking original request" : ticketError ? "Review order issue" : reason ? "Action needed" : "Ready to post";
   panel.dataset.tone = submitting || pending || reason || ticketError ? "warn" : "good";
   $("ticket-message").textContent = submitting ? `Submitting ${paired ? "both independent orders" : "one order"}…` :
-    ticketError || reason || "Limits are frozen when you click Post; either leg may fill.";
+    ticketError || reason || "Review both limits, then post. Prices freeze when you click.";
   $("ticket-receipt").textContent = ticketNotice;
   $("post").disabled = !!reason || submitting;
   $("post").textContent = !status?.trading_enabled ? "Read-only" : paired ? "Post both maker orders" : "Post 1 maker order";
@@ -717,12 +699,12 @@ cards.forEach(card => {
 });
 const rerender = () => { ticketError = ""; ticketNotice = ""; renderTicket(); };
 $("swap-primary").addEventListener("click", () => makePrimary(otherCard()));
-$("mode-single").addEventListener("click", () => { draft.mode = "single"; draft.locked = null; rerender(); });
-$("mode-paired").addEventListener("click", () => { draft.mode = "paired"; draft.locked = null; draft.spreadTouched = false; $("spread").value = ""; rerender(); });
-$("target-other").addEventListener("click", () => { draft.secondTarget = "other_market"; draft.locked = null; draft.spreadTouched = false; $("spread").value = ""; rerender(); });
-$("target-same").addEventListener("click", () => { draft.secondTarget = "same_market"; draft.locked = null; draft.spreadTouched = false; $("spread").value = ""; rerender(); });
+$("mode-single").addEventListener("click", () => { draft.mode = "single"; draft.locked = null; notifyPaperSelectionChange(); rerender(); });
+$("mode-paired").addEventListener("click", () => { draft.mode = "paired"; draft.locked = null; draft.spreadTouched = false; $("spread").value = ""; notifyPaperSelectionChange(); rerender(); });
+$("target-other").addEventListener("click", () => { draft.secondTarget = "other_market"; draft.locked = null; draft.spreadTouched = false; $("spread").value = ""; notifyPaperSelectionChange(); rerender(); });
+$("target-same").addEventListener("click", () => { draft.secondTarget = "same_market"; draft.locked = null; draft.spreadTouched = false; $("spread").value = ""; notifyPaperSelectionChange(); rerender(); });
 for (const [id, relationship] of [["relation-same", "same_outcome"], ["relation-opposite", "opposite_outcomes"]])
-  $(id).addEventListener("click", () => { draft.relationship = relationship; draft.locked = null; draft.spreadTouched = false; $("spread").value = ""; rerender(); });
+  $(id).addEventListener("click", () => { draft.relationship = relationship; draft.locked = null; draft.spreadTouched = false; $("spread").value = ""; notifyPaperSelectionChange(); rerender(); });
 $("lock-relationship").addEventListener("click", () => {
   const card = selectedCard(), other = otherCard();
   if (!card?.data || !other?.data || card.ticker === other.ticker || !draft.relationship || !fresh(card) || !fresh(other)) return;
@@ -730,15 +712,9 @@ $("lock-relationship").addEventListener("click", () => {
     otherOutcome: other.outcome, relationship: draft.relationship};
   draft.spreadTouched = false; $("spread").value = ""; rerender();
 });
-$("price-live").addEventListener("click", () => { draft.pricing = "live"; draft.fixedUnits = null; rerender(); });
+$("price-live").addEventListener("click", () => { draft.pricing = "live"; rerender(); });
 $("price-fixed").addEventListener("click", () => { draft.pricing = "fixed"; $("price").value = centsText(primaryUnits()); rerender(); $("price").focus(); });
 $("price").addEventListener("input", () => { draft.pricing = "fixed"; rerender(); });
-$("tick-offset").addEventListener("input", () => {
-  const raw = $("tick-offset").value;
-  const value = raw.trim() ? Number(raw) : NaN;
-  draft.offset = Number.isInteger(value) && Math.abs(value) <= 100 ? value : NaN;
-  rerender();
-});
 $("spread").addEventListener("input", () => { draft.spreadTouched = true; rerender(); });
 $("use-second-bid").addEventListener("click", () => {
   const second = secondSelection(), primary = primaryUnits();
@@ -758,31 +734,6 @@ $("use-bid").addEventListener("click", () => {
   if (!bid) return;
   draft.pricing = "fixed"; $("price").value = centsText(dollarUnits(bid)); rerender(); $("price").focus();
 });
-$("reset-price").addEventListener("click", () => { draft.pricing = "live"; draft.offset = 0; $("tick-offset").value = "0";
-  draft.spreadTouched = false; $("spread").value = ""; rerender(); });
-function shiftPrimary(direction, preservePair) {
-  const card = selectedCard(), current = primaryUnits(), second = secondSelection(), spread = spreadUnits($("spread").value);
-  if (!card || current === null) return;
-  const accept = preservePair && second && spread !== null ? value => gridFor(second.card, 10000n - value - spread) : () => true;
-  const next = nextGrid(card, current, direction, accept);
-  if (next === null) return;
-  draft.pricing = "fixed"; $("price").value = centsText(next); rerender();
-}
-$("price-down").addEventListener("click", () => shiftPrimary(-1, false));
-$("price-up").addEventListener("click", () => shiftPrimary(1, false));
-$("pair-down").addEventListener("click", () => shiftPrimary(-1, true));
-$("pair-up").addEventListener("click", () => shiftPrimary(1, true));
-function adjustSpread(direction) {
-  const primary = primaryUnits(), second = secondSelection(), spread = spreadUnits($("spread").value);
-  if (primary === null || !second || spread === null) return;
-  for (let value = spread + BigInt(direction); value >= 0n && value <= 10000n; value += BigInt(direction)) {
-    if (gridFor(second.card, 10000n - primary - value)) {
-      $("spread").value = centsText(value); draft.spreadTouched = true; rerender(); return;
-    }
-  }
-}
-$("spread-narrow").addEventListener("click", () => adjustSpread(-1));
-$("spread-widen").addEventListener("click", () => adjustSpread(1));
 $("post").addEventListener("click", () => {
   const clickedAt = performance.now();
   if ($("post").disabled || selected === null) return;

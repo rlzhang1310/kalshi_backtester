@@ -1,28 +1,37 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import pytest
 
 from src.analysis.kalshi.win_rate_by_price import WinRateByPriceAnalysis
+from src.analysis.kalshi.win_rate_by_price_nfl import WinRateByPriceNFLAnalysis
 
 
 def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
-    """Write a tiny archive containing every important filtering edge case."""
+    """Write family partitions containing every important filtering edge case."""
     markets_dir = tmp_path / "markets"
-    trades_dir = tmp_path / "legacy_trades"
-    global_trades_dir = tmp_path / "global_trades"
+    trades_dir = tmp_path / "trades_by_series"
     markets_dir.mkdir()
     trades_dir.mkdir()
-    global_trades_dir.mkdir()
+    metadata = trades_dir / "_metadata"
+    metadata.mkdir()
+    (metadata / "dataset.json").write_text(json.dumps({
+        "run_id": "fixture", "validation_status": "passed",
+        "partition_key": "series_ticker",
+    }))
+    pd.DataFrame({"family": ["KXNFLSPREAD"], "row_count": [1]}).to_parquet(
+        metadata / "family_catalog.parquet", index=False
+    )
 
     pd.DataFrame(
         [
             # The first selected market has repeated trades at the same bins.
             {
-                "ticker": "NFL-SPREAD-TRADED",
+                "ticker": "KXNFLSPREAD-26JAN01BUFNYJ-X",
                 "event_ticker": "KXNFLSPREAD-26JAN01BUFNYJ",
                 "title": "Buffalo spread",
                 "yes_sub_title": "Buffalo -3.5",
@@ -33,7 +42,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             # A finalized matching market must count even without a trade.
             {
-                "ticker": "NFL-SPREAD-NO-TRADE",
+                "ticker": "KXNFLSPREAD-26JAN02MIABOS-X",
                 "event_ticker": "KXNFLSPREAD-26JAN02MIABOS",
                 "title": "Miami spread",
                 "yes_sub_title": "Miami -1.5",
@@ -45,7 +54,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             # A second traded ticker at 40/60 gives those bins two independent
             # market clusters even though the first ticker traded twice.
             {
-                "ticker": "NFL-SPREAD-SECOND-TRADED",
+                "ticker": "KXNFLSPREAD-26JAN02LAXNYG-X",
                 "event_ticker": "KXNFLSPREAD-26JAN02LAXNYG",
                 "title": "Los Angeles spread",
                 "yes_sub_title": "Los Angeles -2.5",
@@ -56,7 +65,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             # Same category, wrong sport.
             {
-                "ticker": "NBA-SPREAD",
+                "ticker": "KXNBASPREAD-26JAN01NYKBOS-X",
                 "event_ticker": "KXNBASPREAD-26JAN01NYKBOS",
                 "title": "New York spread",
                 "yes_sub_title": "New York +2.5",
@@ -67,7 +76,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             # Same sport, wrong category.
             {
-                "ticker": "NFL-MONEYLINE",
+                "ticker": "KXNFLGAME-26JAN03DALPHI-X",
                 "event_ticker": "KXNFLGAME-26JAN03DALPHI",
                 "title": "Who will win?",
                 "yes_sub_title": "Dallas",
@@ -78,7 +87,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             # Matching classification is not enough: it must be finalized.
             {
-                "ticker": "NFL-SPREAD-ACTIVE",
+                "ticker": "KXNFLSPREAD-26JAN04LACHI-X",
                 "event_ticker": "KXNFLSPREAD-26JAN04LACHI",
                 "title": "Los Angeles spread",
                 "yes_sub_title": "Los Angeles -4.5",
@@ -89,7 +98,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             # Nor may a finalized market have an unresolved/non-binary result.
             {
-                "ticker": "NFL-SPREAD-VOID",
+                "ticker": "KXNFLSPREAD-26JAN05SEASFO-X",
                 "event_ticker": "KXNFLSPREAD-26JAN05SEASFO",
                 "title": "Seattle spread",
                 "yes_sub_title": "Seattle +1.5",
@@ -101,7 +110,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             # Mixed families are excluded from narrow categories but included
             # when the user explicitly selects All for this sport.
             {
-                "ticker": "NFL-MIXED-TRADED",
+                "ticker": "KXMVENFLSINGLEGAME-26JAN06-X",
                 "event_ticker": "KXMVENFLSINGLEGAME-26JAN06",
                 "title": "Mixed NFL legs",
                 "yes_sub_title": "Buffalo wins and total over 40.5",
@@ -113,13 +122,13 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
         ]
     ).to_parquet(markets_dir / "markets.parquet", index=False)
 
-    pd.DataFrame(
+    trade_frame = pd.DataFrame(
         [
             # Stored counter-prices are intentionally bad. The taker price is
             # authoritative, so these become 60/40 YES/NO positions.
             {
                 "trade_id": "selected-yes-taker",
-                "ticker": "NFL-SPREAD-TRADED",
+                "ticker": "KXNFLSPREAD-26JAN01BUFNYJ-X",
                 "count": 2,
                 "yes_price": 60,
                 "no_price": 7,
@@ -128,7 +137,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             {
                 "trade_id": "selected-no-taker",
-                "ticker": "NFL-SPREAD-TRADED",
+                "ticker": "KXNFLSPREAD-26JAN01BUFNYJ-X",
                 "count": 3,
                 "yes_price": 12,
                 "no_price": 60,
@@ -137,7 +146,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             {
                 "trade_id": "selected-second-market",
-                "ticker": "NFL-SPREAD-SECOND-TRADED",
+                "ticker": "KXNFLSPREAD-26JAN02LAXNYG-X",
                 "count": 1,
                 "yes_price": 60,
                 "no_price": 40,
@@ -146,7 +155,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             {
                 "trade_id": "wrong-sport",
-                "ticker": "NBA-SPREAD",
+                "ticker": "KXNBASPREAD-26JAN01NYKBOS-X",
                 "count": 10,
                 "yes_price": 70,
                 "no_price": 30,
@@ -155,7 +164,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             {
                 "trade_id": "wrong-category",
-                "ticker": "NFL-MONEYLINE",
+                "ticker": "KXNFLGAME-26JAN03DALPHI-X",
                 "count": 10,
                 "yes_price": 80,
                 "no_price": 20,
@@ -164,7 +173,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             {
                 "trade_id": "not-finalized",
-                "ticker": "NFL-SPREAD-ACTIVE",
+                "ticker": "KXNFLSPREAD-26JAN04LACHI-X",
                 "count": 10,
                 "yes_price": 90,
                 "no_price": 10,
@@ -173,7 +182,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             {
                 "trade_id": "not-resolved",
-                "ticker": "NFL-SPREAD-VOID",
+                "ticker": "KXNFLSPREAD-26JAN05SEASFO-X",
                 "count": 10,
                 "yes_price": 95,
                 "no_price": 5,
@@ -182,7 +191,7 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
             },
             {
                 "trade_id": "mixed-family",
-                "ticker": "NFL-MIXED-TRADED",
+                "ticker": "KXMVENFLSINGLEGAME-26JAN06-X",
                 "count": 1,
                 "yes_price": 55,
                 "no_price": 45,
@@ -190,13 +199,26 @@ def _analysis_kwargs(tmp_path: Path) -> dict[str, Path]:
                 "created_time": "2026-01-01T00:00:06Z",
             },
         ]
-    ).to_parquet(global_trades_dir / "trades.parquet", index=False)
+    )
+    for family, group in trade_frame.groupby(trade_frame.ticker.str.split("-").str[0]):
+        folder = trades_dir / f"series_ticker={family}"
+        folder.mkdir()
+        group.to_parquet(folder / "part-0.parquet", index=False)
 
     return {
         "trades_dir": trades_dir,
-        "global_trades_dir": global_trades_dir,
         "markets_dir": markets_dir,
     }
+
+
+def test_named_nfl_analysis_reads_only_matching_published_families(tmp_path: Path) -> None:
+    analysis = WinRateByPriceNFLAnalysis(**_analysis_kwargs(tmp_path))
+    output = analysis.run()
+    try:
+        assert not output.data.empty
+        assert 70 not in output.data.price.tolist()  # NBA print is in another partition.
+    finally:
+        plt.close(output.figure)
 
 
 def test_run_filters_by_sport_and_category_and_builds_both_positions(

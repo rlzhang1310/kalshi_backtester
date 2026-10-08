@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from src.analysis.kalshi.util.trades import create_organized_trades_view
 from src.common.analysis import Analysis, AnalysisOutput
 from src.common.interfaces.chart import ChartConfig, ChartType, UnitType
 
@@ -37,12 +38,13 @@ class EvYesVsNoAnalysis(Analysis):
             description="Expected value comparison of YES vs NO bets by price level",
         )
         base_dir = Path(__file__).parent.parent.parent.parent
-        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades")
+        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
         self.markets_dir = Path(markets_dir or base_dir / "data" / "kalshi" / "markets")
 
     def run(self) -> AnalysisOutput:
         """Execute the analysis and return outputs."""
         con = duckdb.connect()
+        create_organized_trades_view(con, self.trades_dir)
 
         # Calculate YES win rate at each yes_price
         yes_df = con.execute(
@@ -51,7 +53,7 @@ class EvYesVsNoAnalysis(Analysis):
                 t.yes_price AS price,
                 SUM(CASE WHEN m.result = 'yes' THEN t.count ELSE 0 END) * 1.0 / SUM(t.count) AS win_rate,
                 SUM(t.count) AS total_contracts
-            FROM '{self.trades_dir}/*.parquet' t
+            FROM analysis_trades t
             INNER JOIN '{self.markets_dir}/*.parquet' m ON t.ticker = m.ticker
             WHERE m.result IN ('yes', 'no')
               AND t.yes_price BETWEEN 1 AND 99
@@ -67,7 +69,7 @@ class EvYesVsNoAnalysis(Analysis):
                 t.no_price AS price,
                 SUM(CASE WHEN m.result = 'no' THEN t.count ELSE 0 END) * 1.0 / SUM(t.count) AS win_rate,
                 SUM(t.count) AS total_contracts
-            FROM '{self.trades_dir}/*.parquet' t
+            FROM analysis_trades t
             INNER JOIN '{self.markets_dir}/*.parquet' m ON t.ticker = m.ticker
             WHERE m.result IN ('yes', 'no')
               AND t.no_price BETWEEN 1 AND 99

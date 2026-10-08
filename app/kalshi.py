@@ -105,6 +105,12 @@ class KalshiAdapter:
     async def get_market(self, ticker: str) -> dict:
         return (await self._request("GET", f"/markets/{quote(ticker, safe='')}"))["market"]
 
+    async def get_event(self, event_ticker: str) -> dict:
+        return (await self._request("GET", f"/events/{quote(event_ticker, safe='')}"))["event"]
+
+    async def get_series(self, series_ticker: str) -> dict:
+        return (await self._request("GET", f"/series/{quote(series_ticker, safe='')}"))["series"]
+
     async def get_orderbook(self, ticker: str) -> dict:
         return await self._request("GET", f"/markets/{quote(ticker, safe='')}/orderbook")
 

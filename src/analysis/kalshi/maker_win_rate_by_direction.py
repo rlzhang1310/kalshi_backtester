@@ -13,6 +13,7 @@ import duckdb
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from src.analysis.kalshi.util.trades import create_organized_trades_view
 from src.common.analysis import Analysis, AnalysisOutput
 from src.common.interfaces.chart import ChartConfig, ChartType, UnitType
 
@@ -30,12 +31,13 @@ class MakerWinRateByDirectionAnalysis(Analysis):
             description="Maker win rate by position direction (YES vs NO)",
         )
         base_dir = Path(__file__).parent.parent.parent.parent
-        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades")
+        self.trades_dir = Path(trades_dir or base_dir / "data" / "kalshi" / "trades_by_series")
         self.markets_dir = Path(markets_dir or base_dir / "data" / "kalshi" / "markets")
 
     def run(self) -> AnalysisOutput:
         """Execute the analysis and return outputs."""
         con = duckdb.connect()
+        create_organized_trades_view(con, self.trades_dir)
 
         df = con.execute(
             f"""
@@ -52,7 +54,7 @@ class MakerWinRateByDirectionAnalysis(Analysis):
                     CASE WHEN m.result = 'yes' THEN 1.0 ELSE 0.0 END AS won,
                     t.count AS contracts,
                     'YES' AS maker_side
-                FROM '{self.trades_dir}/*.parquet' t
+                FROM analysis_trades t
                 INNER JOIN resolved_markets m ON t.ticker = m.ticker
                 WHERE t.taker_side = 'no'
             ),
@@ -63,7 +65,7 @@ class MakerWinRateByDirectionAnalysis(Analysis):
                     CASE WHEN m.result = 'no' THEN 1.0 ELSE 0.0 END AS won,
                     t.count AS contracts,
                     'NO' AS maker_side
-                FROM '{self.trades_dir}/*.parquet' t
+                FROM analysis_trades t
                 INNER JOIN resolved_markets m ON t.ticker = m.ticker
                 WHERE t.taker_side = 'yes'
             ),
